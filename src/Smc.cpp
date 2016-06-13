@@ -3,7 +3,7 @@
 #include <cmath>
 #include <ctime>
 #include <vector>
-#include<algorithm>
+#include <algorithm>
 #include <Eigen/Dense>
 #include <omp.h>
 #include <gsl/gsl_randist.h>
@@ -12,6 +12,7 @@
 #include "Smc.hpp"
 #include "Model.hpp"
 #include "Farm.hpp"
+#include "Mvngen.hpp"
 
 #define LFLAG 1
 
@@ -22,6 +23,8 @@ using std::vector;
 using std::flush;
 using std::ofstream;
 using std::to_string;
+using std::pow;
+using std::exp;
 
 /** \brief Constructor.
  * \param nc int Number of threads.
@@ -49,9 +52,9 @@ Smc::Smc(int nc,int nn,int ss,Farms& frms)  {
   weights_old.resize(N);
   weights_new.resize(N);
   means.resize(npar);
-  sigma = VectorXd::Zero(npar);
+  sigma = MatrixXd::Zero(npar,npar);
   tolerance.resize(nmet);
-  tolerance.fill(100.0);
+  tolerance.fill(0.2);
   epsilons = MatrixXd::Zero(N,nmet);
   step = 0;
 }
@@ -69,13 +72,14 @@ void Smc::run()  {
     cout << "ROUND: "<<step << endl;
     iterate();
     update();
-    cout << "\n\n" << endl;
+    cout << "\n" << endl;
     write(dat,eps,wht,sig);
     dat.close();
     eps.close();
   }
   wht.close();
   sig.close();
+  rngfree();
 }
 
 
@@ -90,7 +94,7 @@ void Smc::write(ofstream& dat, ofstream& eps, ofstream& wht, ofstream& sig)  {
   dat << particles_old << endl;
   wht << ess << "\t" << weights_old.transpose() << "\n"<<flush;
   eps << tolerance.transpose() << "\n" << epsilons << "\n\n"<<flush;
-  sig << means.transpose() <<"\n" << sigma.transpose() << endl;
+  sig << means.transpose() <<"\n" << sigma << endl;
 }
 
 /** \brief Looping through all particles in this round. Spawns however many threads to run through.
@@ -129,10 +133,10 @@ void Smc::gen(int i,int cno)  {
       vector<unsigned int> samp(N,0);
       gsl_ran_multinomial(r[cno],N,1,&weights_old[0],&samp[0]);
       int j = find(samp.begin(),samp.end(),1)-samp.begin();
-      VectorXd pb = perturbation(cno);
-      if (pb.size()!=particles_new.row(i).size())  {cout << "!!WTF!!"<<endl;}
-      //cout << particles_new.row(i) << "\n" << pb.transpose() << endl;
-      particles_new.row(i) = particles_old.row(j) + pb.transpose();// CRASHED HERE??
+      //VectorXd pb = perturbation(cno);
+      //if (pb.size()!=particles_new.row(i).size())  {cout << "!!WTF!!"<<endl;}
+      //particles_new.row(i) = particles_old.row(j) + pb.transpose();// CRASHED HERE??
+      particles_new.row(i) = particles_old.row(j) + perturbation(cno).transpose();// CRASHED HERE??
     }
     models[cno].parse(particles_new.row(i));
     pcheck = models[cno].params.prior_check();
@@ -145,11 +149,12 @@ void Smc::gen(int i,int cno)  {
  * \return VectorXd
  */
 VectorXd Smc::perturbation(int cno)  {
-  VectorXd v(npar);
+  /*VectorXd v(npar);
   for (int p=0;p<npar;++p)  {
     v(p) = gsl_ran_gaussian(r[cno],0.68*sigma(p));
   }
-  return(v);
+  return(v);*/
+  return(mgen(sigma,r[cno]));
 }
 
 
@@ -205,14 +210,18 @@ void Smc::update()  {
   ess = 1.0/weights_old.squaredNorm();
   // Calc sigma and shrink for next round of perturbations
   if (LFLAG) cout << "m" << flush;
-  means = particles_new.colwise().sum()/double(N);
+  means = particles_new.colwise().mean();
   if (LFLAG) cout << "s" << flush;
-  sigma.fill(0.0);
+
+/*  sigma.fill(0.0);
   for (int i=0;i<N;++i)  {  // (particles_new-means).sum() ???
     VectorXd diff = particles_new.row(i)-means.transpose();
     sigma += diff.cwiseProduct(diff);
   }
-  sigma /= double(N);
+  sigma /= double(N);*/
+  MatrixXd centered = particles_new.rowwise() - means;
+  sigma = (centered.adjoint() * centered) / double(N-1.0);
+
   // Shrink tolerance
   if (LFLAG) cout << "t" << flush;
   for (int i=0;i<nmet;++i)  {
@@ -242,10 +251,16 @@ double Smc::pert_dens(int i, int j)  {
     ker *= gsl_ran_gaussian_pdf(dist(p),sigma(p));
   }
   return(ker);
+
+  return(pow(6.2831853,-N*0.5) * sigma.determinant() * exp(double(-0.5*(dist-means)*sigma.inverse()*(dist-means))));
 }
 
 
-
+void Smc::rngfree()  {
+  for (unsigned int i=0;i<r.size();++i)  {
+    gsl_rng_free(r[i]);
+  }
+}
 
 
 

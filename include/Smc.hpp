@@ -20,7 +20,7 @@ public:
   void update();
   double pert_dens(int,int);
   void write(std::ofstream&,std::ofstream&,std::ofstream&,std::ofstream&);
-
+  void rngfree();
 
   std::vector<gsl_rng*> r;                    /// RNGs
   std::vector<Model> models;                  /// Model, duh.
@@ -31,7 +31,7 @@ public:
   Eigen::VectorXd tolerance;                  /// For each metric, to be shrunk with each step
   Eigen::MatrixXd epsilons;                   /// Calcd error for each particle's metrics
   Eigen::VectorXd means;                      /// To iteratively calc
-  Eigen::VectorXd sigma;                      /// Calc variance, to update kernel
+  Eigen::MatrixXd sigma;                      /// Calc variance, to update kernel
   double ess;                                 /// Effective Sample Size, duh.
   int step;                                   /// How many filtering steps done
   int N;                                      /// Number of particles to accept at each step
