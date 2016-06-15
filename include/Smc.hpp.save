@@ -32,7 +32,7 @@ public:
   Eigen::MatrixXd epsilons;                   /// Calcd error for each particle's metrics
   Eigen::VectorXd means;                      /// To iteratively calc
   Eigen::MatrixXd sigma;                      /// Calc variance, to update kernel
-  Eigen::MatrixXd sginv;                      /// Store the inverse too, for pdf
+  Eigen::MatrixXd sginv;
   double ess;                                 /// Effective Sample Size, duh.
   int step;                                   /// How many filtering steps done
   int N;                                      /// Number of particles to accept at each step

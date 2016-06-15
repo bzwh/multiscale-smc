@@ -3,7 +3,7 @@ IDIR = include
 ODIR = obj
 INC = -I./include -I/usr/local/eigen
 
-CXX = g++ -g -O3 -std=c++11
+CXX = g++ -g -fopenmp -O3 -std=c++11
 
 LFLAGS = -lgsl -lgslcblas -DHAVE_INLINE -lgomp 
 

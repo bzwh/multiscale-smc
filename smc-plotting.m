@@ -3,7 +3,7 @@ clear
 pth = 'c:/users/huben/Dropbox/ms-smc/outputs/';
 %pth = 'D:/Ben/projects/multiscale-smc/outputs/';
 %pth = './outputs/';
-pth = 'n:/mathematical Biology/private/staff folders/ben/outputs/ms-smc/outputs/';
+%pth = 'n:/mathematical Biology/private/staff folders/ben/outputs/ms-smc/outputs/';
 dfiles = dir([pth 'dat*txt' ]);
 pars = {};
 for i=1:size(dfiles,1)
@@ -52,14 +52,14 @@ for rn=1:nrnd
     [k,fd] = mykerest(pall(ids,i));%,kmin(i+1),kmax(i+1));
     l=plot(k,pdf(fd,k),'Color',cc(rn,:),'linewidth',lw);
     l.Color(4)=(1-cfd)*rn/nrnd+cfd;
-    xlabel(lbls(i));
   end
 end
 
 for i=1:nparam
   subplot(2,3,i)
   hold all
-  l=plot(pars{nrnd}(:,i),zeros(1,N),'.','MarkerSize',10,'Color',[0.35,0.35,0.35,0.1]);
+  l=plot(pars{nrnd}(:,i),abs(normrnd(0,1e-5*range(pars{nrnd}(:,i)),[N,1])),'.','MarkerSize',10,'Color',[0.1,0.1,0.1,0.01]);
+  xlabel(lbls(i));
 end
 
 subplot(2,3,6)

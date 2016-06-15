@@ -94,7 +94,7 @@ void Smc::write(ofstream& dat, ofstream& eps, ofstream& wht, ofstream& sig)  {
   dat << particles_old << endl;
   wht << ess << "\t" << weights_old.transpose() << "\n"<<flush;
   eps << tolerance.transpose() << "\n" << epsilons << "\n\n"<<flush;
-  sig << means <<"\n\n" << sigma << "\n\n" << sginv << endl;
+  sig << means <<"\n" << sigma << endl;
 }
 
 /** \brief Looping through all particles in this round. Spawns however many threads to run through.
@@ -246,7 +246,6 @@ double Smc::pert_dens(int i, int j)  {
   VectorXd dist = (particles_new.row(i)-particles_old.row(j)).transpose()-means;
   //cout << endl << "dist" << endl << dist << endl;
   VectorXd mtmp = dist.transpose()*sginv*dist;
-  if (mtmp.size()!=1) cout << "mtmpsizewtf" << endl;
   //cout << "mtmp:" << mtmp.size() << endl;
   return(exp(double(-0.5*mtmp(0))));
 }
