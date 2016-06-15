@@ -20,7 +20,7 @@ public:
   void update();
   double pert_dens(int,int);
   void write(std::ofstream&,std::ofstream&,std::ofstream&,std::ofstream&);
-
+  void rngfree();
 
   std::vector<gsl_rng*> r;                    /// RNGs
   std::vector<Model> models;                  /// Model, duh.

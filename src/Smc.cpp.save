@@ -246,9 +246,9 @@ double Smc::pert_dens(int i, int j)  {
   for (int p=0;p<npar;++p)  {
     ker *= gsl_ran_gaussian_pdf(dist(p),sigma(p));
   }
-
-  //ker = exp(-0.5*( (diff-means).transpose() * sigma.inverse() * (diff-means) ));
-
+  
+  exp(-0.5*())
+  
   return(ker);
 }
 
