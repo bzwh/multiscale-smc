@@ -166,7 +166,7 @@ void Farms::loadcps()  {
   }
   else  {
     cout << "\n\n NO CONTIGUITY DATA \n\n";
-    //exit(-1);
+    exit(-1);
   }
   /*ofstream cptest("cptest");  // dump CPs as read/stored.
   for (int i=0;i<188496;++i)  {
