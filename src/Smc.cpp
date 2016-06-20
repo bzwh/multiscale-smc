@@ -149,12 +149,7 @@ void Smc::gen(int i,int cno)  {
  * \return VectorXd
  */
 VectorXd Smc::perturbation(int cno)  {
-  /*VectorXd v(npar);
-  for (int p=0;p<npar;++p)  {
-    v(p) = gsl_ran_gaussian(r[cno],0.68*sigma(p));
-  }
-  return(v);*/
-  return(mgen(sigma,r[cno]));
+  return(mgen(0.68*sigma,r[cno]));
 }
 
 
@@ -208,29 +203,25 @@ void Smc::update()  {
   // Effective sample size
   if (LFLAG) cout << "e" << flush;
   ess = 1.0/weights_old.squaredNorm();
-  // Calc sigma and shrink for next round of perturbations
+
+  // Calc mu and sigma for next round of perturbations
   if (LFLAG) cout << "m" << flush;
   means = particles_new.colwise().mean().transpose();
   if (LFLAG) cout << "s" << flush;
-
-
   MatrixXd centered = particles_new.rowwise() - means.transpose();
   sigma = (centered.adjoint() * centered) / double(N-1.0);
   sginv = sigma.inverse();
+
   // Shrink tolerance
   if (LFLAG) cout << "t" << flush;
   for (int i=0;i<nmet;++i)  {
-    //tolerance(i) = std::max(0.0,0.8*epsilons.col(i).maxCoeff());
     VectorXd v = epsilons.col(i);
     std::sort(v.data(),v.data()+v.size());
-    tolerance(i) = v[round(0.8*N)];
+    tolerance(i) = v[round(0.5*N)];         // TODO: median vs nth percentile efficiency?
   }
-  //std::sort(epsilons.data(),epsilons.data()+N);
-  //tolerance = epsilons(round(0.5*N));
 
   // Particles
   particles_old = particles_new;
-  if (LFLAG) cout << endl;
 }
 
 
