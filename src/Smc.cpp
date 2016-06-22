@@ -123,7 +123,7 @@ void Smc::iterate()  {
 void Smc::gen(int i,int cno)  {
   models[cno].resetsim();
   int pcheck = 1;
-  while (pcheck)  {
+  while (pcheck!=0)  {
     int ready = 0;
     if (step==0)  {
       particles_old.row(i) = models[cno].init_samp(ready);
@@ -139,7 +139,7 @@ void Smc::gen(int i,int cno)  {
       particles_new.row(i) = particles_old.row(j) + perturbation(cno).transpose();// CRASHED HERE??
     }
     models[cno].parse(particles_new.row(i));
-    pcheck = models[cno].params.prior_check();
+    pcheck = models[cno].params.prior_check();  // 0 for all good
   }
 }
 
@@ -194,7 +194,7 @@ void Smc::update()  {
       for (int j=0;j<N;++j)  {
         w_sum += weights_old(j)*pert_dens(i,j);
       }
-      weights_new[i] = models[0].params.prior_check() / w_sum;  // FIXME flat prior, so...
+      weights_new[i] = 1.0/w_sum; // Flat priors already adhered to in gen
     }
   }
   // Normalise
