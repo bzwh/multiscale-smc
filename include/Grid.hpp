@@ -31,7 +31,7 @@ class Grid  {
 
     int whichgrid(int,double,double);         // Identify gridnumber given (x,y)
     double gdist(int,int);                    // Minimum distance between two grids
-    void setup(Farms&);
+    void setup(const Farms&);
     void reset();
     Grid();
 

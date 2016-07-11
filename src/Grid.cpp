@@ -38,7 +38,7 @@ Grid::Grid()  {
  * \param farms Farms&
  * \return void
  */
-void Grid::setup(Farms& farms)  {
+void Grid::setup(const Farms& farms)  {
   xmin = 0.0; //floor(farms.xmax/sz)*sz;
   xmax = ceil(farms.xmax/sz)*sz;
   ymin = 0.0; //floor(farms.ymax/sz)*sz;

@@ -41,9 +41,10 @@ Smc::Smc(int nc,int nn,int ss,Farms& frms)  {
   }
   N = nn;
   nround = ss;
-  models.resize(nchains,Model());
+  models.reserve(nchains);
   for (int cno=0;cno<nchains;++cno)  {
-    models[cno].setup(r[cno],frms);
+    models.push_back(Model(frms));
+    models[cno].setup(r[cno]);
   }
   npar = models[0].params.pnum; // == particles[0].size()
   nmet = frms.enreg;                 // Number of metrics to test against...

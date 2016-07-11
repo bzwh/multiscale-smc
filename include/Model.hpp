@@ -17,6 +17,8 @@
   Give it a parameter set, run the simulation, output the fit metric to update chain.
  */
 class Model  {
+protected:
+  const Farms& farms;
 public:
   // TODO
   Eigen::VectorXd init_samp(int&);
@@ -26,8 +28,8 @@ public:
 
 
   // Methods
-  Model();
-  void setup(gsl_rng*,const Farms&);        //!< Just grabs Farm data and stores away the RNG
+  Model(Farms&);
+  void setup(gsl_rng*);        //!< Just grabs Farm data and stores away the RNG
   void setrdat(int,std::string);  //!< Comprehensive output of simulation runs
   void initrun();         //!< Give parameter set to run simulation
   void parse(const Eigen::VectorXd&);
@@ -60,7 +62,7 @@ public:
   int N;
   int plaw; // to come from params...
   int pdet; // to come from params...
-  Farms farms;
+
   Grid grid;
   Params params;
 

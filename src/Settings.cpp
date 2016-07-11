@@ -17,7 +17,7 @@ namespace G_CONST  {
   const int multisc = 0;   // Within-farm model or step function
 
   const int simtmax = 242;
-  const int withtmx = 100;
+  const int withtmx = 20;
   const int seedday = 23;  // Condition on 23rd Feb
 
   const int dump_epi = 0;

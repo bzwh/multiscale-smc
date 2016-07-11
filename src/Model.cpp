@@ -21,7 +21,7 @@ using namespace std;
 // TODO vaccination routine and parameters
 // TODO JPN CPs
 
-Model::Model()  {
+Model::Model(Farms& frms) : farms(frms) {
   tmax = G_CONST::simtmax; // 242 runs 01 Feb - 01 Oct.
   twmx = G_CONST::withtmx;
 }
@@ -32,9 +32,8 @@ Model::Model()  {
  * \param rr pointer for all your randoming needs
  * \param frms const ref to all the farm data as read in from files. this stuff stays untouched.
  */
-void Model::setup(gsl_rng* rr,const Farms& frms)  {
+void Model::setup(gsl_rng* rr)  {
   r = rr;
-  farms = frms;
   N = farms.ncnt;
   S = N;
   I = 0;  II.resize(tmax,0);
@@ -114,7 +113,7 @@ void Model::initrun()  {
   pdet = params.pdet;
   // NOTE old ker[0] absorbed
   params.ker[0] = 1.0/(params.ker[0]*params.ker[0]);
-  params.ker[1] = params.ker[1]/2.0; // kernel uses d^2 to avoid the sqrt
+  params.ker[1] = params.ker[1]*0.5; // kernel uses d^2 to avoid the sqrt
   sus_calc();
   maxrate_calc();
   seed_run();
@@ -788,9 +787,13 @@ void Model::resetsim()  {
   fill(nculd.begin(),nculd.end(),0);
   infd = vector< vector<int> >(5,vector<int>(3,0));
   culd = vector< vector<int> >(5,vector<int>(3,0));
-  //tblty = vector< vector<double> >(N,vector<double>(20,0.0));
-  tblty.clear();
-  tblty.resize(N,vector<double>(twmx,0.0));
+  // TODO careful of memory overheads here! - see massif profile. trade against time...
+  for (int itmp=0;itmp<tblty.size();++itmp)  {
+    fill(tblty[itmp].begin(),tblty[itmp].end(),0.0);
+  }
+  //tblty = vector< vector<double> >(N,vector<double>(twmx,0.0));
+  //tblty.clear();
+  //tblty.resize(N,vector<double>(twmx,0.0));
   //tblty.resize(N); for(int i=0;i<N;++i)  {tblty[i].reserve(20);} // FIXME SPACE!
 
   fill(sus.begin(),sus.end(),0.0);
