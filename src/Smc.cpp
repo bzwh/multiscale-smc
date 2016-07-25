@@ -33,16 +33,16 @@ using std::exp;
  * \param frms Farms& Big chunk of const data, just pass through to Model (avoid reading repeatedly)
  */
 Smc::Smc(int nc,int nn,int ss,Farms& frms)  {
-  nchains = nc;
-  r.resize(nchains);
-  for (int cno=0;cno<nchains;++cno)  {
+  nthreads = nc;
+  r.resize(nthreads);
+  for (int cno=0;cno<nthreads;++cno)  {
     r[cno] = gsl_rng_alloc(gsl_rng_mt19937);
     gsl_rng_set(r[cno],(cno+1.0)*time(0));
   }
   N = nn;
   nround = ss;
-  models.reserve(nchains);
-  for (int cno=0;cno<nchains;++cno)  {
+  models.reserve(nthreads);
+  for (int cno=0;cno<nthreads;++cno)  {
     models.push_back(Model(frms));
     models[cno].setup(r[cno]);
   }
@@ -60,6 +60,14 @@ Smc::Smc(int nc,int nn,int ss,Farms& frms)  {
   step = 0;
 }
 
+/*
+void Smc::restart()  {
+  int old_round = 4;
+  ifstream wfile("./outputs/wht.txt");
+  ifstream sfile("./outputs/sig.txt");
+  ifstream efile("./outputs/err"+to_string(old_round)+".txt");
+}
+*/
 
 /** \brief Loop rounds of filtering. Opens output files and calls write();
  * \return void
@@ -102,7 +110,7 @@ void Smc::write(ofstream& dat, ofstream& eps, ofstream& wht, ofstream& sig)  {
  * \return void
  */
 void Smc::iterate()  {
-  #pragma omp parallel for num_threads(nchains)
+  #pragma omp parallel for num_threads(nthreads) schedule(dynamic)
   for (int i=0;i<N;++i)  {
     int cno = omp_get_thread_num();
     cout << i << "-" << cno << ":" << flush;

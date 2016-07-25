@@ -51,7 +51,7 @@ void Model::setup(gsl_rng* rr)  {
   time_c.resize(N,-1);
   i_by.resize(N,-1);
   sus.resize(N,0.0);
-  tblty.resize(N,vector<double>(twmx,0.0));
+  tblty.resize(N,vector<double>(0,0.0));
   // Init the grids - requires farm locations
   grid.setup(farms);
   igrids.resize(grid.ngrids,0);// Total infection counts in each grid over all runs
@@ -545,7 +545,7 @@ void Model::without(int ifarm)  {
   for (int k=latent;k<20;++k)  {
     tblty[ifarm].push_back(tt);
   }*/
-  //tblty[ifarm].resize(20,0.0);
+  tblty[ifarm].resize(1+latent + delay + params.delayipc,0.0);
   fill(tblty[ifarm].begin()+latent,tblty[ifarm].end(),tt);
 }
 
@@ -712,7 +712,7 @@ inline
 double Model::trans(int i)  {
   if (t>time_c[i])  {
     cout << t << " " << i << " " << time_i[i] << " " << time_r[i] << " " << time_c[i] << " " << states[i] << " " << farms.N[i][0] << " " << farms.N[i][2] << " siadfhaksjm" << endl;
-    return(0.0);
+    exit(-1);
   }
   else  {
     return(tblty[i][t-time_i[i]]);

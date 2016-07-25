@@ -39,7 +39,7 @@ public:
   int npar;                                   /// Number of parameters.
   int nround;
   int nmet;
-  int nchains;
+  int nthreads;
 
 private:
 

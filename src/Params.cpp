@@ -489,7 +489,7 @@ void Params::parse(const VectorXd& v)  {
     // TODO may well work, but only for 1 region. needs splitting for S_sheep. reg*pper?
     sb[reg][0] = v[i++];
     tb[reg][0] = v[i++];
-    tb[reg][1] = v[i++];
+    tb[reg][2] = v[i++];
     if (plaw)  {
       sp[reg][0] = v[i++];
       sp[reg][2] = v[i++];
