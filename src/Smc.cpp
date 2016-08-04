@@ -1,5 +1,7 @@
 #include <iostream>
+#include <string>
 #include <fstream>
+#include <sstream>
 #include <cmath>
 #include <ctime>
 #include <vector>
@@ -14,7 +16,9 @@
 #include "Farm.hpp"
 #include "Mvngen.hpp"
 
+
 #define LFLAG 1
+#define CFLAG 0
 
 using namespace Eigen;
 using std::cout;
@@ -25,6 +29,8 @@ using std::ofstream;
 using std::to_string;
 using std::pow;
 using std::exp;
+using std::stringstream;
+using std::string;
 
 /** \brief Constructor.
  * \param nc int Number of threads.
@@ -37,7 +43,8 @@ Smc::Smc(int nc,int nn,int ss,Farms& frms)  {
   r.resize(nthreads);
   for (int cno=0;cno<nthreads;++cno)  {
     r[cno] = gsl_rng_alloc(gsl_rng_mt19937);
-    gsl_rng_set(r[cno],(cno+1.0)*time(0));
+    //gsl_rng_set(r[cno],(cno+1.0)*time(0));
+    gsl_rng_set(r[cno],1);
   }
   N = nn;
   nround = ss;
@@ -55,9 +62,11 @@ Smc::Smc(int nc,int nn,int ss,Farms& frms)  {
   means.resize(npar);
   sigma = MatrixXd::Zero(npar,npar);
   tolerance.resize(nmet);
-  tolerance.fill(0.2);
+  //tolerance.fill(0.17);
+  tolerance << 0.105,0.165,0.180,0.140,0.08;
   epsilons = MatrixXd::Zero(N,nmet);
   step = 0;
+
 }
 
 /*
@@ -112,14 +121,17 @@ void Smc::write(ofstream& dat, ofstream& eps, ofstream& wht, ofstream& sig)  {
 void Smc::iterate()  {
   #pragma omp parallel for num_threads(nthreads) schedule(dynamic)
   for (int i=0;i<N;++i)  {
+    stringstream lstream;
     int cno = omp_get_thread_num();
-    cout << i << "-" << cno << ":" << flush;
+    lstream << i << "-" << cno << ": ";
+    cout << lstream.str() << flush;
     int acc = 0;
     while (acc==0)  {
       gen(i,cno);
       runmodel(i,cno);
       acc = test(i,cno);
     }
+    lstream.str(string());
   }
 }
 
@@ -142,13 +154,15 @@ void Smc::gen(int i,int cno)  {
       vector<unsigned int> samp(N,0);
       gsl_ran_multinomial(r[cno],N,1,&weights_old[0],&samp[0]);
       int j = find(samp.begin(),samp.end(),1)-samp.begin();
-      //VectorXd pb = perturbation(cno);
-      //if (pb.size()!=particles_new.row(i).size())  {cout << "!!WTF!!"<<endl;}
-      //particles_new.row(i) = particles_old.row(j) + pb.transpose();// CRASHED HERE??
-      particles_new.row(i) = particles_old.row(j) + perturbation(cno).transpose();// CRASHED HERE??
+      particles_new.row(i) = particles_old.row(j) + perturbation(cno).transpose();
     }
+    /*stringstream lstream;
+    lstream << particles_new.row(i) << "\n";
+    cout << lstream.str() << flush;
+    lstream.str(string());*/
     models[cno].parse(particles_new.row(i));
     pcheck = models[cno].params.prior_check();  // 0 for all good
+    cout << pcheck << flush;
   }
 }
 
@@ -158,7 +172,16 @@ void Smc::gen(int i,int cno)  {
  * \return VectorXd
  */
 VectorXd Smc::perturbation(int cno)  {
-  return(mgen(0.68*sigma,r[cno]));
+  if (CFLAG)  {
+    return(mgen(0.68*sigma,r[cno]));
+  }
+  else  {
+    VectorXd v(npar);
+    for (int p=0;p<npar;++p)  {
+      v(p) = gsl_ran_gaussian(r[cno],0.68*(sginv(p)));
+    }
+    return(v);
+  }
 }
 
 
@@ -218,8 +241,14 @@ void Smc::update()  {
   means = particles_new.colwise().mean().transpose();
   if (LFLAG) cout << "s" << flush;
   MatrixXd centered = particles_new.rowwise() - means.transpose();
-  sigma = (centered.adjoint() * centered) / double(N-1.0);
-  sginv = sigma.inverse();
+  if (CFLAG)  {
+    sigma = (centered.adjoint() * centered) / double(N-1.0);
+    sginv = sigma.inverse();
+  }
+  else  {
+    sigma = ((centered.cwiseProduct(centered)).colwise().sum())/double(N-1.0);// Component-wise vars
+    sginv = sigma.array().sqrt();
+  }
 
   // Shrink tolerance
   if (LFLAG) cout << "t" << flush;
@@ -240,15 +269,20 @@ void Smc::update()  {
  * \return double
  */
 double Smc::pert_dens(int i, int j)  {
-  //cout << endl << "sinv" << endl << sginv<< endl;
-  //cout << endl << "mean" << endl << means<< endl;
-  //cout << endl << "pars" << endl << particles_new.row(i)-particles_old.row(j)<< endl;
-  VectorXd dist = (particles_new.row(i)-particles_old.row(j)).transpose()-means;
-  //cout << endl << "dist" << endl << dist << endl;
-  VectorXd mtmp = dist.transpose()*sginv*dist;
-  if (mtmp.size()!=1) cout << "mtmpsizewtf" << endl;
-  //cout << "mtmp:" << mtmp.size() << endl;
-  return(exp(double(-0.5*mtmp(0))));
+  if (CFLAG)  {
+    VectorXd dist = (particles_new.row(i)-particles_old.row(j)).transpose()-means;
+    VectorXd mtmp = dist.transpose()*sginv*dist;
+    if (mtmp.size()!=1) cout << "mtmpsizewtf" << endl;
+    return(exp(double(-0.5*mtmp(0))));
+  }
+  else  {
+    double ker = 1.0;
+    VectorXd dist = particles_new.row(i)-particles_old.row(j);
+    for (int p=0;p<npar;++p)  {
+      ker *= gsl_ran_gaussian_pdf(dist(p),sginv(p));
+    }
+    return(ker);
+  }
 }
 
 
