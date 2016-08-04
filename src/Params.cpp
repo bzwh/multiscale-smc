@@ -314,16 +314,16 @@ cout << "HELLO!" << endl;
 // probs want overdispersed starting point.
 void Params::setrand(gsl_rng* r)  {
   for (int reg=0;reg<nreg;++reg)  {
-    sb[reg][0] = sus_min[reg][0] + (sus_max[reg][0]-sus_min[reg][0])*gsl_rng_uniform(r);
+    sb[reg][0] = gsl_ran_flat(r,sus_min[reg][0],sus_max[reg][0]);
     sb[reg][1] = 0.00001;
     sb[reg][2] = 1.0; // Sus_sheep = 1.0;
-    tb[reg][0] = trn_min[reg][0] + (trn_max[reg][0]-trn_min[reg][0])*gsl_rng_uniform(r);
+    tb[reg][0] = gsl_ran_flat(r,trn_min[reg][0],trn_max[reg][0]);
     tb[reg][1] = 0.00001;
-    tb[reg][2] = trn_min[reg][2] + (trn_max[reg][2]-trn_min[reg][2])*gsl_rng_uniform(r);
+    tb[reg][2] = gsl_ran_flat(r,trn_min[reg][2],trn_max[reg][2]);
   }
   if (pker)  {
-    ker[0] = ker_min[0] + (ker_max[0]-ker_min[0])*gsl_rng_uniform(r);
-    ker[1] = ker_min[1] + (ker_max[1]-ker_min[1])*gsl_rng_uniform(r);
+    ker[0] = gsl_ran_flat(r,ker_min[0],ker_max[0]);
+    ker[1] = gsl_ran_flat(r,ker_min[1],ker_max[1]);
   }
   else  { // Not nec... (depending on original init!)
     ker[0] = 0.12;
@@ -343,21 +343,22 @@ void Params::setrand(gsl_rng* r)  {
   delaydcp = 2;
   delayipc = 1;
   for (int i=0;i<pdcs;++i)  {
-    F[i] = dcFmin[i]+(dcFmax[i]-dcFmin[i])*gsl_rng_uniform(r);
+    F[i] = gsl_ran_flat(r,dcFmin[i],dcFmax[i]);
   }
   if (pdcf)  {
-    f = dcfmin+(dcfmax-dcfmin)*gsl_rng_uniform(r);
+    f = gsl_ran_flat(r,dcfmin,dcfmax);
   }
   else  {
     f = 0.85;
     F[0] = 6.0;
   }
   // TODO clean this up - populating par Eigen::VectorXd
-  // FIXME HORRIBLE NESTED DUPLICATED CODE SHIT - this looks nicer?
   int iblah = 0;
-  par_vec[iblah++] = sb[0][0];
-  par_vec[iblah++] = tb[0][0];
-  par_vec[iblah++] = tb[0][2];
+  for (int reg=0;reg<nreg;++reg)  {
+    par_vec[iblah++] = sb[reg][0];
+    par_vec[iblah++] = tb[reg][0];
+    par_vec[iblah++] = tb[reg][2];
+  }
   for(int i=0;i<pker;++i)  {
     par_vec[iblah++] = ker[i];
   }
@@ -371,8 +372,6 @@ void Params::setrand(gsl_rng* r)  {
     par_vec[iblah++] = f;
   }
   //(iblah==pnum) ? cout<<"!"<<endl : cout<<"WTF"<<endl; // checking right number of parameters...
-
-  // TODO while(boundscheck)???
 }
 
 
@@ -513,6 +512,10 @@ void Params::parse(const VectorXd& v)  {
   delaydcp = 2;   // Delay from notification to removal
   delayipc = 1;   // Delay from report to removal
 
+  if (pnum!=i)  {
+    cout << "PNUM:" << pnum << " i:" << i << endl;
+    exit(-1);
+  }
 }
 
 
@@ -562,6 +565,12 @@ int Params::prior_check()  {
       return(-5);
     }
   }
+  // Fitting infectiousness(?) to report delay?
+  for (int i=0;i<pdet;++i)  {// Delay from farm infectiousness/clinical signs to report
+    if ((ddet[i]<detmin)||(ddet[i]>detmax))  {
+      return(-8);
+    }
+  }
   // Fitting DC cull F - functional form or constant?
   for (int i=0;i<pdcs;++i)  {
     if ((F[i]<dcFmin[i])||(F[i]>dcFmax[i]))  {
@@ -576,7 +585,5 @@ int Params::prior_check()  {
   }
   return(0);  // All within whatever bounds you've decided....
 }
-
-
 
 

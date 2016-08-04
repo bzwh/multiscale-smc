@@ -78,7 +78,6 @@ public:
   Eigen::VectorXd par_vec;                  //!< Next proposed set - parsed in to above details
 
 
-private:
   // Should these be in Chain?
   // These used to generate starting point as well as priors for rejection?
   // Regional species-specific susceptibility range (flat prior)
@@ -87,6 +86,9 @@ private:
   // Regional species-specific transmissibility range (flat prior)
   std::vector< std::vector<double> > trn_min; //!< Flat prior lower bound
   std::vector< std::vector<double> > trn_max; //!< Flat prior upper bound
+
+
+private:
   // Regional species-specific powerlaws
   double sp_min;  //!< Flat prior exponent bounds
   double sp_max;  //!< Flat prior exponent bounds
