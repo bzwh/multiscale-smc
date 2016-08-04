@@ -46,7 +46,7 @@ Farms::Farms()  {
     }
   }
   ncnt = 0;
-  nreg = 0;
+  nreg = G_CONST::fit_reg;
   enreg = 1;
   xmin = 0.0;
   xmax = 0.0;
@@ -93,8 +93,8 @@ void Farms::loadfarms()  {
     N1.resize(ncnt,vector<double>(3,1.0));  // inverses... don't want accidental zero-div
     x.resize(ncnt,-1.0);      // default to off map?
     y.resize(ncnt,-1.0);
-    region.resize(ncnt,0);   // default to not a region, catch reg<0 to ignore state
-    eregion.resize(ncnt,-1);
+    region.resize(ncnt,0);    // default to all region 0, if fitting more, then read.
+    eregion.resize(ncnt,-1);  // default to not a region, catch reg<0 to ignore state
     cps.resize(ncnt);         // farm ids are push_back'd in to this
     fdat.clear();             // reset eof and..
     fdat.seekg(0,ios::beg);   //   ... jump back to beginning of file
@@ -116,6 +116,9 @@ void Farms::loadfarms()  {
       //cout << farms.region[i]<<endl;
     }
     fdat.close();
+    if (G_CONST::fit_reg==5)  {
+      region = eregion;
+    }
   }
   else {
     cout << "\n\nFarms.loadfarms() data error!\n\n";
@@ -130,7 +133,6 @@ void Farms::loadfarms()  {
   vector<int> rtmp = eregion;
   sort(rtmp.begin(),rtmp.end());  // sort region and count changes for unique regions
   auto r_it = rtmp.begin();
-  nreg = 1; // at least 1 region
   while (r_it!=rtmp.end()-1)  {
     if (*(r_it++)!=*r_it)  { // changes
       ++enreg;

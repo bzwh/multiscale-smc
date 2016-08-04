@@ -58,7 +58,7 @@ void Model::setup(gsl_rng* rr)  {
   // Track number of cases & culls for farms and animals
   ninfd.resize(farms.enreg,0);  // Cases
   nculd.resize(farms.enreg,0);  // Culls
-  infd = vector< vector<int> >(farms.enreg,vector<int>(3,0)); // Cases in 5 regions, 3 species
+  infd = vector< vector<int> >(farms.enreg,vector<int>(3,0)); // Cases in 5 #s, 3 species
   culd = vector< vector<int> >(farms.enreg,vector<int>(3,0)); // Culls in 5 regions, 3 species
   ertot.resize(farms.enreg, vector<double> (6,0.0));
 
@@ -100,7 +100,7 @@ void Model::setrdat(int cno,string fpath)  {
   //if (!rdat.is_open())  {
   //    cout << "can't open rundat file" << endl;
   //    exit(-1);
-  //}
+  //
 }
 
 
@@ -128,7 +128,7 @@ void Model::sus_calc()  {
   // FIXME HACKED parameter vs farm region. should be 0 anyway, only eregion[i] is a thing
   if (plaw)  {
     for (int i=0;i<N;++i)  {
-      int reg = 0; //farms.region[i];
+      int reg = farms.region[i];
       sus[i] = params.sb[reg][0]*pow(farms.N[i][0],params.sp[reg][0])
              //+ params.sb[reg][1]*pow(farms.N[i][1],params.sp[reg][1])
              + params.sb[reg][2]*pow(farms.N[i][2],params.sp[reg][2]);
@@ -136,7 +136,7 @@ void Model::sus_calc()  {
   }
   else  {
     for (int i=0;i<N;++i)  {
-      int reg = 0; //farms.region[i];
+      int reg = farms.eregion[i];
       sus[i] = params.sb[reg][0]*farms.N[i][0]
              //+ params.sb[reg][1]*farms.N[i][1]  // FIXME cows+sheep not pigs
              + params.sb[reg][2]*farms.N[i][2];
@@ -691,7 +691,7 @@ void Model::within(int i)  {
 
       // Re-bin for daily steps
       if (trunc(tt)>ind)  {
-        tblty[i][ind] = params.tb[0][0]*icow + params.tb[0][2]*ishp;
+        tblty[i][ind] = params.tb[farms.region[i]][0]*icow + params.tb[farms.region[i]][2]*ishp;
         ++ind;
       }
     }
@@ -788,9 +788,11 @@ void Model::resetsim()  {
   infd = vector< vector<int> >(5,vector<int>(3,0));
   culd = vector< vector<int> >(5,vector<int>(3,0));
   // TODO careful of memory overheads here! - see massif profile. trade against time...
-  for (int itmp=0;itmp<tblty.size();++itmp)  {
+  /*for (int itmp=0;itmp<tblty.size();++itmp)  {
     fill(tblty[itmp].begin(),tblty[itmp].end(),0.0);
-  }
+  }*/
+  tblty.clear();
+  tblty.resize(N,vector<double>(0,0.0));
   //tblty = vector< vector<double> >(N,vector<double>(twmx,0.0));
   //tblty.clear();
   //tblty.resize(N,vector<double>(twmx,0.0));
@@ -920,6 +922,7 @@ Eigen::VectorXd Model::init_samp(int& ready)  {
  * \return void
  */
 void Model::run(Eigen::VectorXd v)  {
+  parse(v);
   runsim();
 }
 
