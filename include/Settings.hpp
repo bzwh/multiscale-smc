@@ -16,6 +16,8 @@ namespace G_CONST  {
   extern const int fit_dcf;     //!< Fitting cull f parameter - tracing accuracy
   extern const int multisc;     //!< Using multi-scale model or step-function
 
+  extern const int cp_cull;     //!< Contiguous premises culled? (UK vs JPN)
+
   extern const int simtmax;     //!< How many days to run the simulation
   extern const int withtmx;     //!< Max length of within-farm epidemic run
   extern const int seedday;     //!< When to seed epidemic

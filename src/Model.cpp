@@ -136,7 +136,7 @@ void Model::sus_calc()  {
   }
   else  {
     for (int i=0;i<N;++i)  {
-      int reg = farms.eregion[i];
+      int reg = farms.region[i];
       sus[i] = params.sb[reg][0]*farms.N[i][0]
              //+ params.sb[reg][1]*farms.N[i][1]  // FIXME cows+sheep not pigs
              + params.sb[reg][2]*farms.N[i][2];
@@ -253,6 +253,7 @@ int Model::runsim() {
       for (int ii=0;ii<farms.enreg;++ii)  {
         fill(ertot[ii].begin(),ertot[ii].end(),1.0e10);
       }
+      //cout << "B" << flush;
       return(0);  // reject
     }
   }
@@ -345,7 +346,9 @@ void Model::detrepcul()  {
         case 1: // Detected IP
           dstate[i] = 2;
           dccull(i);
-          cpcull(i);
+          if (G_CONST::cp_cull)  {
+            cpcull(i);
+          }
         break;
 
         case 0: // Reporting DC/CP
@@ -806,7 +809,7 @@ void Model::resetsim()  {
 }
 
 
-/** \brief Calc and store today's error by Mike's metric (daily cumulative totals of IPs and culled farms/animals)
+/** \brief Calc and store today's error (daily cumulative totals of IPs and culled farms/animals)
  *  Updates the total regional errors based on dstate - that is the changes that have occurred today
  * \return void
  */
