@@ -1,8 +1,13 @@
 clear
 %%
-pth = 'c:/users/huben/Dropbox/ms-smc/outputs/';
-%pth = 'D:/Ben/projects/multiscale-smc/outputs/';
+pth = 'D:/Ben/Dropbox/ms-smc/mallorn_x/';
+pth = 'D:/Ben/Dropbox/ms-smc/custard/';
+pth = 'D:/Ben/Dropbox/ms-smc/mallorn-complex/';
+pth = 'D:/Ben/Dropbox/ms-smc/mallorn-complex/';
+pth = 'D:/Ben/Dropbox/ms-smc/outputs/';
+%pth = './mallorn-/';
 %pth = './outputs/';
+pth = './mallorn-wfm/';
 %pth = 'n:/mathematical Biology/private/staff folders/ben/outputs/ms-smc/outputs/';
 dfiles = dir([pth 'dat*txt' ]);
 pars = {};
@@ -23,66 +28,193 @@ nmet = size(errs{1},2);
 wht = load([pth 'wht.txt']);
   
 %% Particle distributions
+m=2;
+n=2;
+nreg=1;
+nparam = 7;%size(pall,2);
+nrp = (size(pars{1},2)-nparam)/nreg;
 %       Sus    trans      Ker       Delay  DCs  
 kmin = [0  ,0 ,0   ,0   , 0  ,1     ,0 ,0, 1.5,0.0, 0.75];
 kmax = [250,30,1e-4,1e-5, 2.5,12.5  ,15,5, 5.5,0.025, 1];
-figure('units','normalized','outerposition',[0 0 1 1])
+lbls = {'Sus_{cow}','Trans_{cow}','Trans_{sheep}','K_r','K_a','Delay_\mu','Delay_\theta','F_A','F_B','f'};
+if nreg>1
+  rlbl = {'Cumbria','Devon','Wales','Scotland','RoUK'};
+else
+  rlbl = {'',' '};
+end
 cc=parula(nrnd);
 cfd = 0.25;
+lw = 2;
+
+for reg=1:nreg    % Figure for each region separately
+  figure('outerposition',[0,0,1920,1080],'visible','off')
+  for rn=1:nrnd   % Plot each round on all subplots
+    ids =1:size(pars{1},1);
+    pall = pars{rn};
+    % Plot posteriors
+    for i=1:nrp
+      subplot(m,n,i);
+      hold all
+      [k,fd] = mykerest(pall(ids,i+(reg-1)*3));%,kmin(i+1),kmax(i+1));
+      l=plot(k,pdf(fd,k),'Color',cc(rn,:),'linewidth',lw);
+      l.Color(4)=(1-cfd)*rn/nrnd+cfd;
+    end
+  end
+  % Actual particles for final round and labels
+  for i=1:nrp
+    subplot(m,n,i)
+    hold all
+    l=plot(pars{nrnd}(:,i+(reg-1)*3),abs(normrnd(0,1e-5*range(pars{nrnd}(:,i)),[N,1])),'.','MarkerSize',10,'Color',[0.1,0.1,0.1,0.01]);
+    xlabel(lbls(i));
+  end
+
+  subplot(m,n,m*n)
+  hold all
+  lg = {};
+  for i=1:nrnd
+    plot(0,i,'color',cc(i,:),'linewidth',2)
+    lg{i}=num2str(i);
+  end
+  axis off
+  legend(lg)
+  saveas(gcf,[pth 'pars-dens_' rlbl{reg} '.png'])
+  close()
+end
+
+figure('outerposition',[0,0,1920,1080],'visible','off')
+if nparam==2
+  mm=2; nn=2;
+else
+  mm=3; nn=3;
+end
+for i=1:nparam
+  subplot(mm,nn,i)
+  hold all
+  for rn=1:nrnd
+    pall = pars{rn};
+    [k,fd] = mykerest(pall(:,i+nreg*3));%,kmin(i+1),kmax(i+1));
+    l=plot(k,pdf(fd,k),'Color',cc(rn,:),'linewidth',lw);
+    l.Color(4)=(1-cfd)*rn/nrnd+cfd;
+  end
+end
+for i=1:nparam
+  subplot(mm,nn,i)
+  hold all
+  l=plot(pars{nrnd}(:,i+nreg*3),abs(normrnd(0,1e-5*range(pars{nrnd}(:,i)),[N,1])),'.','MarkerSize',10,'Color',[0.1,0.1,0.1,0.01]);
+  xlabel(lbls(i+3));
+end
+subplot(mm,nn,mm*nn)
+hold all
+lg = {};
+for i=1:nrnd
+  plot(0,i,'color',cc(i,:),'linewidth',2)
+  lg{i}=num2str(i);
+end
+axis off
+legend(lg)
+saveas(gcf,[pth 'pars-dens_others.png'])
+close()
+%%
+figure('outerposition',[0,0,1920,1080])
+lbls = {'Sus_{cow}','Trans_{cow}','Trans_{sheep}','K_r','K_a','Delay_\mu','Delay_\theta','F_A','F_B','f'};
+cc=parula(nrnd);
+cfd = 0.25;
+nparam = 5;%size(pall,2);
 for rn=1:nrnd
   ids =1:size(pars{1},1);
   pall = pars{rn};
-  lbls = {'Sus_{cow}','Trans_{cow}','Trans_{sheep}','K_r','K_a','Delay_\mu','Delay_\theta','F_A','F_B','f'};
   lw = 2;
   t_ratio = 0;
-  nparam = size(pall,2);
-
-  if (t_ratio)
-    subplot(2,3,2)
-    hold on
-    [k,fd] = mykerest(pall(ids,2)./pall(ids,3),kmin(1),kmax(1));
-    plot(k,pdf(fd,k),'Color',cc(rn,:),'linewidth',lw)
-    plot(pall(ids,2)./pall(ids,3),1e-6*rand([1,min(sum(ids),length(ids))]),'.','MarkerSize',5)
-    xlabel('T_{cow}/T_{sheep}');
-  end
 
   for i=1:nparam
-    subplot(2,3,i);
+    subplot(m,n,i);
     hold all
-    [k,fd] = mykerest(pall(ids,i));%,kmin(i+1),kmax(i+1));
+    [k,fd] = mykerest(pall(ids,i+5));%,kmin(i+1),kmax(i+1));
     l=plot(k,pdf(fd,k),'Color',cc(rn,:),'linewidth',lw);
     l.Color(4)=(1-cfd)*rn/nrnd+cfd;
   end
 end
 
 for i=1:nparam
-  subplot(2,3,i)
+  subplot(m,n,i)
   hold all
-  l=plot(pars{nrnd}(:,i),abs(normrnd(0,1e-5*range(pars{nrnd}(:,i)),[N,1])),'.','MarkerSize',10,'Color',[0.1,0.1,0.1,0.01]);
-  xlabel(lbls(i));
+  l=plot(pars{nrnd}(:,i+5),abs(normrnd(0,1e-5*range(pars{nrnd}(:,i+5)),[N,1])),'.','MarkerSize',10,'Color',[0.1,0.1,0.1,0.01]);
+  xlabel(lbls(i+5));
 end
 
-subplot(2,3,6)
+subplot(m,n,6)
 hold all
 lg = {};
 for i=1:nrnd
-  plot(0:1,i:i+1,'color',cc(i,:),'linewidth',2)
+  plot(0,i,'color',cc(i,:),'linewidth',2)
   lg{i}=num2str(i);
 end
+axis off
 legend(lg)
-%% Error distributions per metric
-figure
+saveas(gcf,[pth 'pars-dens2.png'])
+close()
+%% Error distributions per metric(region)
+lbls = {'Cumbria','Devon','Wales','Scotland','RoUK'};
+m = 2;
+n = 3;
+figure('outerposition',[0,0,1920,1080],'Visible','off')
 cfd = 0;
 nb = 25;
 cc = parula(nrnd);
-for m=1:nmet
-  subplot(2,3,m)
+for i=1:nmet
+  subplot(m,n,i)
   hold all
-  for r=2:nrnd-1
-    histogram(errs{r}(2:end,m),nb,'FaceColor',cc(r,:),'FaceAlpha',(1-cfd)*r/nrnd+cfd,'EdgeColor','none')
+  for r=nrnd:-1:1
+    histogram(errs{r}(2:end,i),nb,'FaceColor',cc(r,:),'FaceAlpha',(1-cfd)*r/nrnd+cfd,'EdgeColor','none')
     %vline(errs{r}(1,m),'r-.')
     %[h,c] = hist(errs{r}(2:end,m));
     %plot(c,smooth(h/N),'Color',cc(r,:))
   end
+  xlabel(lbls{i});
 end
+subplot(m,n,6)
+hold all
+lg = {};
+for i=1:nrnd
+  plot(0,i,'color',cc(i,:),'linewidth',2)
+  lg{i}=num2str(i);
+end
+axis off
+legend(lg)
+saveas(gcf,[pth 'errs.png'])
+close
 %%
+np = size(pars{nrnd},2);
+N = size(pars{nrnd},1);
+nb = 10;
+
+lbls = {'Sus_{cow}','Trans_{cow}','Trans_{sheep}','K_r','K_a'};
+
+figure('units','normalized','outerposition',[0 0 1 1])
+for i=1:np
+  for j=1:np
+    if i==j
+      subplot(np,np,(j-1)*np+i)
+      [h,c]=hist(pars{nrnd}(:,i),nb);
+      plot(c,h/N);
+      xlabel(lbls{i})
+    elseif i>j
+      subplot(np,np,(j-1)*np+i)
+      if(0)
+        plot(pars{nrnd}(:,j),pars{nrnd}(:,i),'.');
+      else
+        hh=hist3(pars{nrnd}(:,[j,i]),[nb,nb]);
+        h = hh';
+        h(size(hh,1) + 1, size(hh,2) + 1) = 0;
+        h(h==0) = NaN;
+        yb = linspace(min(pars{nrnd}(:,i)),max(pars{nrnd}(:,i)),size(hh,1)+1);
+        xb = linspace(min(pars{nrnd}(:,j)),max(pars{nrnd}(:,j)),size(hh,1)+1);
+        p=pcolor(xb,yb,h);
+        set(p,'Edgecolor','none');
+      end
+    end
+  end
+end
+saveas(gcf,[pth 'corrs.png'])
+
+

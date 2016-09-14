@@ -11,7 +11,7 @@ using namespace Eigen;
 
 /// NOTE: Current (bad) model selection: priors min/max, nreg, plaw, pker
 
-/// NOTE: change parameters -> priors, sigmas, itopram, pnum, mu/cov updates, #check, MESSY
+/// NOTE: change parameters -> priors, sigmas, itopram, pnum, mu/cov updates, # check, MESSY
 /// TODO: externalise priors; read from file, store with outputs
 /// TODO: just keep cov and mu as MatrixXd VectorXd, instead of jumping between
 //  req some map pnum i -> sb/sp/tb/tp/ker/etc
@@ -35,10 +35,11 @@ Params::Params()  {
     pdet = G_CONST::fit_det ? 2 : 0; // Fitting ~gamma(u,k)
     pdcs = G_CONST::fit_dcs;         // 2-dist, 1-const, 0-nope
     pdcf = G_CONST::fit_dcf;         // Fitting DC f accuracy
-    with = G_CONST::multisc;         // 1: Within farm SEmInR model  0: Step function
+    pwfm = G_CONST::fit_msc ?10 : 0;// Fitting within-farm model parameters
+    rwfm = G_CONST::multisc;         // 1: Within farm SEmInR model  0: Step function
 
     pper = (plaw) ? 7 : 3;   // number of regionalised parameters (sus and trans, no powerlaws)
-    pnum = nreg*pper+pker+pdet+pdcs+pdcf;
+    pnum = nreg*pper+pker+pdet+pdcs+pdcf+pwfm;
     storage_setup(); // storage
 
     // Initialising priors here??? - put in list??
@@ -64,15 +65,14 @@ Params::Params()  {
       tp_min = 0.0;
       tp_max = 1.0;
     }
-    // Delays - detection/reporting/cull
-    // TODO Regionalised detection and cull delays? probably not...
-    if (pdet)  {
-      detmin = 1.0;
-      detmax = 12.5;
+    // Delay from infectiousness to report (detection)
+    if (pdet)  {  // FIXME same priors for shape and scale of gam delay?
+      fill(detmin.begin(),detmin.end(),0.0);
+      fill(detmax.begin(),detmax.end(),15.0);
     }
-    delaydcp = 2;
+    // Time to cull for reported IPs and DC/CPs (24/48hours)
     delayipc = 1;
-
+    delaydcp = 2;
     // DC cull parameters
     if (pdcs==2)  {
       dcFmin[1] = 1.0/150.0;         // So F peaks t=(50,150)
@@ -88,6 +88,10 @@ Params::Params()  {
       dcfmin = 0.75;//0.5;
       dcfmax = 1.0;//1.0;
     }
+    if (pwfm)  {
+      // Well priors are already read in via load_transmission() - req'd for rwfm anyways
+    }
+
     f = 0.85;
     F[0] = 6.0;
     // Kernel parameters
@@ -101,6 +105,68 @@ Params::Params()  {
 }
 
 
+/** \brief With model specified, initialise storage space for parameters and priors
+ * Doesn't care whether read from file or hardcoded.
+ */
+void Params::storage_setup()  {
+  // Setup: Sus/Trans regional parameters
+  sb.resize(nreg,vector<double>(nspc,0.0));
+  tb.resize(nreg,vector<double>(nspc,0.0));
+  // Setup: Powerlaws
+  if (plaw)  { // default to [0,1]
+    sp.resize(nreg,vector<double>(nspc,0.5));
+    tp.resize(nreg,vector<double>(nspc,0.5));
+  }
+  ddet.resize(pdet);
+  switch (pdet)  {
+    case 1:
+      ddet[0] = 4;
+      break;
+    case 2:
+      ddet[0] = 4.0;
+      ddet[1] = 1.0;
+  }
+  if (pdet)  {
+    detmin.resize(pdet,0.0);
+    detmax.resize(pdet,0.0);
+  }
+  // Setup: Kernel parameters
+  ker.resize(2,0.0);
+  ker_min.resize(pker,0.0);
+  ker_max.resize(pker,0.0); // cheap, no real need to check if these are actually going to be used
+  // Vaccination WIP
+  vaccrange.resize(2,0.0);
+  // Priors: Sus/Trans
+  sus_min.resize(nreg,vector<double>(nspc,0.0));
+  sus_max.resize(nreg,vector<double>(nspc,0.0));
+  trn_min.resize(nreg,vector<double>(nspc,0.0));
+  trn_max.resize(nreg,vector<double>(nspc,0.0));
+  if (pdcs)  {
+    F.resize(pdcs,0.0);
+  }
+  else  {
+    F.resize(1,0.0);
+  }
+
+  dcFmin.resize(pdcs,0.0);
+  dcFmax.resize(pdcs,0.0);
+  if (rwfm)  {
+    latk.resize(2,vector<double>(2,0.0));
+    latm.resize(2,vector<double>(2,0.0));
+    infk.resize(2,vector<double>(2,0.0));
+    infm.resize(2,vector<double>(2,0.0));
+    beta.resize(2,vector<double>(2,0.0));
+    kE.resize(2,0.0);
+    mE.resize(2,0.0);
+    kI.resize(2,0.0);
+    mI.resize(2,0.0);
+    bt.resize(2,vector<double>(2,0.0));
+    load_transmission();
+  }
+  par_vec.resize(pnum);
+}
+
+
 /** \brief Loads gamma parameters from SG cattle and BH sheep transmission anaylsis.
  * Don't need to call if not running within-farm model
  * \return void
@@ -108,73 +174,42 @@ Params::Params()  {
 void Params::load_transmission()  {
   ifstream cowdat;
   #ifdef _WIN32_WINNT
-    cowdat.open("D:/Ben/data/uk/GammaParameters_COW.txt");
+    cowdat.open("D:/Ben/data/uk/wfm-cows.txt");
   #endif // _WIN32_WINNT
   #ifdef __linux__
-    cowdat.open("../../data/uk/GammaParameters_COW.txt");
+    cowdat.open("../../data/uk/wfm-cows.txt");
   #endif // __linux__
-
-  if(cowdat.is_open())  { // m muE n muI B
-    int num = std::count(std::istreambuf_iterator<char>(cowdat),
-                      std::istreambuf_iterator<char>(),'\n');
-    cowdat.clear();             // reset eof and..
-    cowdat.seekg(0,ios::beg);   //   ... jump back to beginning of file
-
-    m_cows.resize(num,0);
-    sigma_cows.resize(num,0.0);
-    n_cows.resize(num,0);
-    gamma_cows.resize(num,0.0);
-    beta_cows.resize(num,0.0);
-    double mm,nn,ss,gg,bb;
-    for (int i=0;i<num;++i)  {
-      cowdat >> mm >> ss >> nn >> gg >> bb; // NB ss and gg here are mean periods - not transition rates
-      m_cows[i] = mm;
-      sigma_cows[i] = mm/ss;  // COW(:,[2 4]) = mean latent and infectious periods. inverse for rate
-      n_cows[i] = nn;
-      gamma_cows[i] = nn/gg;
-      beta_cows[i] = bb;
-    }
+  if(cowdat.is_open())  { // these should be shape and scale of gam fit'd model pars
+    cowdat >> latk[0][0] >> latk[0][1]
+           >> latm[0][0] >> latm[0][1]
+           >> infk[0][0] >> infk[0][1]
+           >> infm[0][0] >> infm[0][1]
+           >> beta[0][0] >> beta[0][1];
+  cowdat.close();
   }
   else  {
     cout << "where's my goddamn cow data?!?!?!?!?!?!?!?!?" << endl;
     exit(-1);
   }
-  cowdat.close();
-
   ifstream shpdat;
   #ifdef _WIN32_WINNT
-    shpdat.open("D:/Ben/data/uk/GammaParameters_SHEEP.txt");
+    shpdat.open("D:/Ben/data/uk/wfm-lamb.txt");
   #endif // _WIN32_WINNT
   #ifdef __linux__
-    shpdat.open("../../data/uk/GammaParameters_SHEEP.txt");
+    shpdat.open("../../data/uk/wfm-lamb.txt");
   #endif // __linux__
-  if(shpdat.is_open())  { // m 1/muE n 1/muI B
-    int num = std::count(std::istreambuf_iterator<char>(shpdat),
-                      std::istreambuf_iterator<char>(),'\n');
-    shpdat.clear();             // reset eof and..
-    shpdat.seekg(0,ios::beg);   //   ... jump back to beginning of file
-
-    m_shps.resize(num,0);
-    sigma_shps.resize(num,0.0);
-    n_shps.resize(num,0);
-    gamma_shps.resize(num,0.0);
-    beta_shps.resize(num,0.0);
-    double mm,nn,ss,gg,bb;
-    for (int i=0;i<num;++i)  {
-      shpdat >> mm >> ss >> nn >> gg >> bb;
-      m_shps[i] = mm;
-      sigma_shps[i] = mm/ss;
-      n_shps[i] = nn;
-      gamma_shps[i] = nn/gg;
-      beta_shps[i] = bb;
-//      cout << m_shps[i] << "\t" << sigma_shps[i] << "\t" << n_shps[i] << "\t" << gamma_shps[i] << "\t" << beta_shps[i] << "\n";
-    }
+  if(shpdat.is_open())  { // these should be shape and scale for sheep
+    shpdat >> latk[1][0] >> latk[1][1]
+           >> latm[1][0] >> latm[1][1]
+           >> infk[1][0] >> infk[1][1]
+           >> infm[1][0] >> infm[1][1]
+           >> beta[1][0] >> beta[1][1];
+  shpdat.close();
   }
   else  {
     cout << "where's my goddamn sheep data?!?!?!?!?!?!?!?!?" << endl;
     exit(-1);
   }
-  shpdat.close();
 }
 
 
@@ -216,57 +251,6 @@ void Params::pwrite(std::ofstream& pdat)  {
   pdat << par_vec << endl;
 }
 
-
-
-/** \brief With model specified, initialise storage space for parameters and priors
- * Doesn't care whether read from file or hardcoded.
- */
-void Params::storage_setup()  {
-  // Setup: Within-farm SEmInR parameters
-  /*m.resize(nspc,0); sigma.resize(nspc,0.0);
-  n.resize(nspc,0); gamma.resize(nspc,0.0);
-  beta.resize(nspc,vector<double>(nspc,0.0));*/
-  if (with)  {
-    load_transmission();
-  }
-  // Setup: Sus/Trans regional parameters
-  sb.resize(nreg,vector<double>(nspc,0.0));
-  tb.resize(nreg,vector<double>(nspc,0.0));
-  // Setup: Powerlaws
-  if (plaw)  { // default to [0,1]
-    sp.resize(nreg,vector<double>(nspc,0.5));
-    tp.resize(nreg,vector<double>(nspc,0.5));
-  }
-  ddet.resize(pdet);
-  switch (pdet)  {
-    case 1:
-      ddet[0] = 4;
-      break;
-    case 2:
-      ddet[0] = 4.0;
-      ddet[1] = 1.0;
-  }
-  // Setup: Kernel parameters
-  ker.resize(2,0.0);
-  ker_min.resize(pker,0.0);
-  ker_max.resize(pker,0.0); // cheap, no real need to check if these are actually going to be used
-  // Vaccination WIP
-  vaccrange.resize(2,0.0);
-  // Priors: Sus/Trans
-  sus_min.resize(nreg,vector<double>(nspc,0.0));
-  sus_max.resize(nreg,vector<double>(nspc,0.0));
-  trn_min.resize(nreg,vector<double>(nspc,0.0));
-  trn_max.resize(nreg,vector<double>(nspc,0.0));
-  if (pdcs)  {
-    F.resize(pdcs,0.0);
-  }
-  else  {
-    F.resize(1,0.0);
-  }
-  dcFmin.resize(pdcs,0.0);
-  dcFmax.resize(pdcs,0.0);
-  par_vec.resize(pnum);
-}
 
 /// TODO init on file. req's model selection and 2 sets of parameters. (means and cov elsewhere)
 /// Basically, externalise the initialisation. easier to read what's going on in different runs
@@ -329,17 +313,10 @@ void Params::setrand(gsl_rng* r)  {
     ker[0] = 0.12;
     ker[1] = 3.0;
   }
-  if (pdet==1)  {
-    //delaydet = floor(detmin+(detmax-detmin+1)*gsl_rng_uniform(r));
-    ddet[0] = detmin+(detmax-detmin+1)*gsl_rng_uniform(r);
+  for (int i=0;i<pdet;++i)  {
+    ddet[i] = gsl_ran_flat(r,detmin[i],detmax[i]);
   }
-  else if (pdet==2)  {
-    ddet[0] = detmin+(detmax-detmin+1)*gsl_rng_uniform(r);
-    ddet[1] = 5.0*gsl_rng_uniform(r);
-  }
-  else  {
-    delaydet = 4.0;
-  }
+  delaydet = 4.0;
   delaydcp = 2;
   delayipc = 1;
   for (int i=0;i<pdcs;++i)  {
@@ -351,6 +328,20 @@ void Params::setrand(gsl_rng* r)  {
   else  {
     f = 0.85;
     F[0] = 6.0;
+  }
+  if (rwfm)  {
+    kE[0] = gsl_ran_gamma(r,latk[0][0],latk[0][1]);
+    kE[1] = gsl_ran_gamma(r,latk[1][0],latk[1][1]);
+    mE[0] = gsl_ran_gamma(r,latm[0][0],latm[0][1]);
+    mE[1] = gsl_ran_gamma(r,latm[1][0],latm[1][1]);
+    kI[0] = gsl_ran_gamma(r,infk[0][0],infk[0][1]);
+    kI[1] = gsl_ran_gamma(r,infk[1][0],infk[1][1]);
+    mI[0] = gsl_ran_gamma(r,infm[0][0],infm[0][1]);
+    mI[1] = gsl_ran_gamma(r,infm[1][0],infm[1][1]);
+    bt[0][0] = gsl_ran_gamma(r,beta[0][0],beta[0][1]);
+    bt[0][1] = 0.06;
+    bt[1][1] = gsl_ran_gamma(r,beta[1][0],beta[1][1]);
+    bt[1][0] = 0.06;
   }
   // TODO clean this up - populating par Eigen::VectorXd
   int iblah = 0;
@@ -370,6 +361,18 @@ void Params::setrand(gsl_rng* r)  {
   }
   if (pdcf)  {
     par_vec[iblah++] = f;
+  }
+  if (pwfm)  {
+    par_vec[iblah++] = kE[0];
+    par_vec[iblah++] = kE[1];
+    par_vec[iblah++] = mE[0];
+    par_vec[iblah++] = mE[1];
+    par_vec[iblah++] = kI[0];
+    par_vec[iblah++] = kI[1];
+    par_vec[iblah++] = mI[0];
+    par_vec[iblah++] = mI[1];
+    par_vec[iblah++] = bt[0][0];
+    par_vec[iblah++] = bt[1][1];
   }
   //(iblah==pnum) ? cout<<"!"<<endl : cout<<"WTF"<<endl; // checking right number of parameters...
 }
@@ -508,6 +511,18 @@ void Params::parse(const VectorXd& v)  {
   if (pdcf)  {
     f = v[i++]; // Accuracy of identifying DCs
   }
+  if (pwfm)  {
+    kE[0] = v[i++];
+    kE[1] = v[i++];
+    mE[0] = v[i++];
+    mE[1] = v[i++];
+    kI[0] = v[i++];
+    kI[1] = v[i++];
+    mI[0] = v[i++];
+    mI[1] = v[i++];
+    bt[0][0] = v[i++];
+    bt[1][1] = v[i++];
+  }
   // TODO allow for delays and control parameters
   delaydcp = 2;   // Delay from notification to removal
   delayipc = 1;   // Delay from report to removal
@@ -518,6 +533,25 @@ void Params::parse(const VectorXd& v)  {
   }
 }
 
+
+/** \brief Take sample from wfm priors - only when not actually fitting.
+ * \param r gsl_rng*
+ * \return void
+ */
+void Params::wfm_samp(gsl_rng* r)  {
+  kE[0] = gsl_ran_gamma(r,latk[0][0],latk[0][1]);     // 2 species' latent shape
+  kE[1] = gsl_ran_gamma(r,latk[1][0],latk[1][1]);
+  mE[0] = gsl_ran_gamma(r,latm[0][0],latm[0][1]);     // 2 species' latent mean
+  mE[1] = gsl_ran_gamma(r,latm[1][0],latm[1][1]);
+  kI[0] = gsl_ran_gamma(r,infk[0][0],infk[0][1]);     // 2 species' infectious shape
+  kI[1] = gsl_ran_gamma(r,infk[1][0],infk[1][1]);
+  mI[0] = gsl_ran_gamma(r,infm[0][0],infm[0][1]);     // 2 species' infectious mean
+  mI[1] = gsl_ran_gamma(r,infm[1][0],infm[1][1]);
+  bt[0][0] = gsl_ran_gamma(r,beta[0][0],beta[0][1]);  // Inter/intra species transmission rates
+  bt[0][1] = 0.06;
+  bt[1][1] = gsl_ran_gamma(r,beta[1][0],beta[1][1]);
+  bt[1][0] = 0.06;
+}
 
 // Should these checks be going in Chain? Not nec for rejection sampling
 /** \brief Check parameter values are within bounds. Uniform priors.
@@ -565,9 +599,9 @@ int Params::prior_check()  {
       return(-5);
     }
   }
-  // Fitting infectiousness(?) to report delay?
+  // Fitting delay infectiousness(?) to report?
   for (int i=0;i<pdet;++i)  {// Delay from farm infectiousness/clinical signs to report
-    if ((ddet[i]<detmin)||(ddet[i]>detmax))  {
+    if ((ddet[i]<detmin[i])||(ddet[i]>detmax[i]))  {
       return(-8);
     }
   }

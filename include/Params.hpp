@@ -27,22 +27,23 @@ public:
   void parse(const VectorXd&);
   void pread(std::ifstream&);
   void load_transmission();         //!< Load transmission outputs for within-farm model
+  void wfm_samp(gsl_rng*);
 
   // DATA
   int pnum; //!< Total number of parameters being fitted
-  int nreg; //!< #regional parameter sets (just fitting 1 set!)
-  int nspc; //!< #species (sort of hacked at 3)
+  int nreg; //!< # regional parameter sets (just fitting 1 set!)
+  int nspc; //!< # species (sort of hacked at 3)
   int plaw; //!< toggle power law or linear scaling
-  int pker; //!< #kernel parameters
-  int pper; //!< #parameters per region
-  int pdet; //!< #parameters for delay to detection (gamma distributed)
-  int pdcs; //!< #parameters for DC cull - F (distributed?)
+  int pker; //!< # kernel parameters
+  int pper; //!< # parameters per region
+  int pdet; //!< # parameters for delay to detection (gamma distributed)
+  int pdcs; //!< # parameters for DC cull - F (distributed?)
   int pdcf; //!< toggle for DC cull - f (const?)
-
+  int pwfm; //!< toggle for fitting wfm gamma shape/mean latent+infectious periods, beta
   // BETWEEN FARM PARAMETERS
   // Susceptibility & transmissibility parameters for each region
   // 0:Cubria, 1:Devon, 2:Wales, 3:Scotland, 4:Rest of England
-  int with;
+  int rwfm;                                 //!< Running within-farm model?
   std::vector< std::vector<double> > sb;    //!< Susceptibility coefficient
   std::vector< std::vector<double> > tb;    //!< Transmissibility coefficient
   // Powerlaws
@@ -63,8 +64,8 @@ public:
   // Vaccinations??
   std::vector<double> vaccrange;            //!< inner/outer radii of vaccination annulus
 
-  // WITHIN-FARM SEmInR parameters - But these are to be read from file and selected randomly!
-  std::vector<int> m_cows;                   //!< Number of exposed classes
+  // WITHIN-FARM SEmInR parameters - But these were to be read from file and selected randomly...
+  /*std::vector<int> m_cows;                   //!< Number of exposed classes
   std::vector<int> m_shps;                   //!< Number of exposed classes
   std::vector<double> sigma_cows;            //!< Mean latent period
   std::vector<double> sigma_shps;            //!< Mean latent period
@@ -73,9 +74,20 @@ public:
   std::vector<double> gamma_cows;            //!< Mean infectious period
   std::vector<double> gamma_shps;            //!< Mean infectious period
   std::vector<double> beta_cows;             //!< Transmission parameter
-  std::vector<double> beta_shps;             //!< Transmission parameter
+  std::vector<double> beta_shps;             //!< Transmission parameter  */
+  // But not anymore... now read the gamma-fitted marginal posteriors and resample
+  std::vector< std::vector<double> > latk;    //!< Latent period shape gam point priors
+  std::vector< std::vector<double> > latm;    //!< Latent period mean gam point priors
+  std::vector< std::vector<double> > infk;    //!< Infectious period shape gam point priors
+  std::vector< std::vector<double> > infm;    //!< Infectious period mean gam point priors
+  std::vector< std::vector<double> > beta;    //!< Beta gam point priors
 
-  Eigen::VectorXd par_vec;                  //!< Next proposed set - parsed in to above details
+  std::vector<double> kE;     //!< Current sample's latent period shape
+  std::vector<double> mE;     //!< Current sample's latent period mean
+  std::vector<double> kI;     //!< Current sample's infectious period shape
+  std::vector<double> mI;     //!< Current sample's infectious period mean
+  std::vector< std::vector<double> > bt;
+  Eigen::VectorXd par_vec;                    //!< Next proposed set - parsed in to above details
 
 
   // Should these be in Chain?
@@ -94,10 +106,10 @@ private:
   double sp_max;  //!< Flat prior exponent bounds
   double tp_min;  //!< Flat prior exponent bounds
   double tp_max;  //!< Flat prior exponent bounds
-  double detmin;
-  double detmax;
   double dcfmin;
   double dcfmax;
+  std::vector<double> detmin;
+  std::vector<double> detmax;
   std::vector<double> dcFmin;
   std::vector<double> dcFmax;
   std::vector<double> ker_min;

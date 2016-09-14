@@ -14,8 +14,9 @@ namespace G_CONST  {
   extern const int fit_det;     //!< Fitting detection delay parameters?
   extern const int fit_dcs;     //!< Fitting culls F parameters (distribution?)
   extern const int fit_dcf;     //!< Fitting cull f parameter - tracing accuracy
-  extern const int multisc;     //!< Using multi-scale model or step-function
+  extern const int fit_msc;     //!< Fitting the WFM parameters
 
+  extern const int multisc;     //!< Using multi-scale model or step-function
   extern const int cp_cull;     //!< Contiguous premises culled? (UK vs JPN)
 
   extern const int simtmax;     //!< How many days to run the simulation

@@ -14,8 +14,9 @@ namespace G_CONST  {
   const int fit_det = 1;   // Fit gamma distribution to detection delay. 0:constant, 1:gamma
   const int fit_dcs = 2;   // Time-invariant or some functional form or not fitting at all? 2:dist,1:const,0:off
   const int fit_dcf = 1;   // Fitting f
-  const int multisc = 0;   // Within-farm model or step function
+  const int fit_msc = 1;   // Fitting WFM parameters (k,mu,beta)
 
+  const int multisc = 1;   // Within-farm model or step function
   const int cp_cull = 1;   // Contiguous premises to be culled or not? (ie UK vs JPN...)
 
   const int simtmax = 242;

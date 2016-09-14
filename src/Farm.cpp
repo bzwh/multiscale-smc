@@ -59,8 +59,10 @@ void Farms::bigload()  { // hahaha.
   // why not just put in constructor? cos then part of Epi::Epi()...
   cout << "Loading farms: " + fmdat << endl;
   loadfarms();
-  cout << "Loading CPs: " + cpdat << endl;
-  loadcps();
+  if (G_CONST::cp_cull)  {
+    cout << "Loading CPs: " + cpdat << endl;
+    loadcps();
+  }
   cout << "Loading seeds: " + whdat << "\t" << flush;
   loadseeds(G_CONST::seedday); // (t=1) == (Feb 1st)
   cout <<   seedfarms.size() << endl;

@@ -16,6 +16,8 @@
 #include "Params.hpp"
 #include "Settings.hpp"
 
+#define LFLAG 0
+
 using namespace std;
 
 // TODO vaccination routine and parameters
@@ -29,8 +31,7 @@ Model::Model(Farms& frms) : farms(frms) {
 
 /** \brief Initialise Model. Holds basically everything...
  * Loads up farm data etc. sets up vectors for states and transitions, blahblahblah
- * \param rr pointer for all your randoming needs
- * \param frms const ref to all the farm data as read in from files. this stuff stays untouched.
+ * \param rr gsl_rng* pointer for all your randoming needs
  */
 void Model::setup(gsl_rng* rr)  {
   r = rr;
@@ -253,10 +254,11 @@ int Model::runsim() {
       for (int ii=0;ii<farms.enreg;++ii)  {
         fill(ertot[ii].begin(),ertot[ii].end(),1.0e10);
       }
-      //cout << "B" << flush;
+      cout << "B" << flush;
       return(0);  // reject
     }
   }
+  cout << "ITOT(" << Itot << ")" << endl;
   return(1);      // accept
 }
 
@@ -387,7 +389,7 @@ void Model::update()  {
       case 1: // Infection
         states[i] = 1;
         time_i[i] = t;
-        (params.with) ? within(i) : without(i); // std::function  functor? function pointer? OTT?
+        (params.rwfm) ? within(i) : without(i); // std::function  functor? function pointer? OTT?
         ++I; ++II[t]; ++Itot;
         --S;
         ++igrids[grid.g_id[i]];
@@ -434,7 +436,7 @@ void Model::update()  {
 
 
 /** \brief Identify DCs of the detected infectious farm i. dstate[DC] = 3
- * \param i int - infectious farm
+ * \param ifarm int - infectious farm
  */
 void Model::dccull(int ifarm)  { // TODO grid this? Probably not worth it
   double prob = 0.0;
@@ -508,13 +510,13 @@ double Model::dker(double d2)  {
 
 
 /** \brief Without farm model. Generating step-function profile for farm i
- * \param i int
+ * \param ifarm int
  * \return void
  */
 void Model::without(int ifarm)  {
   double tt = 0.0; // temp calc of transmissibility
+  int delay = 0;    // delay to detection after infectiousness(==
   int latent = 5;
-  int delay = 0;
   switch (pdet)  {
     case 1:
       delay = params.ddet[0];
@@ -555,60 +557,214 @@ void Model::without(int ifarm)  {
 /**  \brief Within-farm SEmInR model. Grab parameters from read-in files.
  */
 void Model::within(int i)  {
+  int HACKFLAG = 1;
+  Eigen::Vector2d ptot = Eigen::Vector2d::Zero();
+  Eigen::Vector2d n1pop(1.0,1.0);  // Inverse of population...
+  ptot << farms.N[i][0],farms.N[i][2];
+  n1pop << farms.N1[i][0],farms.N1[i][2];
+  if (ptot.sum()==0)  {  // How the hell did it get infected then???
+    time_r[i] = t+1;
+    time_c[i] = t+1;
+    if (i!=66481)  {// belongs to seed farms for the UK outbreak
+      // err...
+    }
+  }
+  else  {
+    while(HACKFLAG)  {
+      double tt = 0.0;                    // Time post-infection
+      double tau = 0.1;                   // Discrete time steps
+      double disp_r = 1.12;
+      Eigen::Vector2d seed_mu = Eigen::Vector2d::Zero();
+      Eigen::Vector2i seeds = Eigen::Vector2i::Zero();
+      Eigen::Vector2i m_spc = Eigen::Vector2i::Zero();
+      Eigen::Vector2i n_spc = Eigen::Vector2i::Zero();
+      Eigen::Vector2d sigma_spc = Eigen::Vector2d::Zero();
+      Eigen::Vector2d gamma_spc = Eigen::Vector2d::Zero();
+      Eigen::Vector2d nsus = Eigen::Vector2d::Zero();
+      Eigen::Vector2d ninf = Eigen::Vector2d::Zero();
+      for (int spc=0;spc<ptot.rows();++spc)  {
+        n1pop(spc) = (ptot(spc)) ? 1.0/ptot(spc) : 1.0;
+        // Initial infections - see Schley ModelInf09 effect vacc undetected persistence
+        // FIXME they're only for cows... but what to do with sheep?
+        seed_mu(spc) = 4.21+0.00386*ptot(spc);
+        while (seeds(spc)==0)  {
+          seeds(spc) = gsl_ran_negative_binomial(r,1.0-seed_mu(spc)/(disp_r+seed_mu(spc)),disp_r);
+        }
+        m_spc(spc) = floor(params.kE[spc]);
+        n_spc(spc) = max(int(floor(params.kI[spc])),1);
+        sigma_spc(spc) = m_spc(spc)/params.mE[spc];
+        gamma_spc(spc) = n_spc(spc)/params.mI[spc];
+      }
+      Eigen::Matrix2d beta;
+      beta << params.bt[0][0] , 0.06,  // 0.06 from de Rueda
+              0.06 , params.bt[1][1];
+
+      if (LFLAG)  {
+        cout << "\n";
+        cout << " a: " << ptot.transpose() << endl;
+        cout << " m: " << m_spc.transpose() << "\n n: " << n_spc.transpose() << "\n";
+        cout << " s: " << sigma_spc.transpose() << "\n g: " << gamma_spc.transpose() << "\n";
+        cout << " b: " << beta << "\n";
+        cout << " I: " << seeds.transpose() << "\n";
+      }
+
+      // Populations - full vectors
+      vector<Eigen::VectorXi> pops(2);
+      for (int spc=0;spc<2;++spc)  {
+        pops[spc] = Eigen::VectorXi::Zero(m_spc(spc)+n_spc(spc)+2);
+        int ptmp = ptot(spc);
+        pops[spc](1) = min(ptmp,seeds(spc));
+        pops[spc](0) = ptot(spc)-pops[spc](1);
+        nsus(spc) = pops[spc](0);
+        ninf(spc) = pops[spc].segment(m_spc(spc)+1,n_spc(spc)).sum();
+      }
+      // rates of change
+      vector<Eigen::VectorXd> rate(2);
+      rate[0] = Eigen::VectorXd::Zero(m_spc(0)+n_spc(0)+2);
+      rate[1] = Eigen::VectorXd::Zero(m_spc(1)+n_spc(1)+2);
+      // population changes per time-step
+      vector<Eigen::VectorXi> dpop(2);
+      dpop[0] = Eigen::VectorXi::Zero(m_spc(0)+n_spc(0)+2);
+      dpop[1] = Eigen::VectorXi::Zero(m_spc(1)+n_spc(1)+2);
+      //cout << dpop[0].transpose() << endl << dpop[1].transpose() << endl;
+      int ind = 1;        // day post infection - also index for tblty vector
+      int t_wend = twmx-1;    // Time end of within-farm simulation
+      vector<double> tb_tmp(twmx,0.0);
+      int iflag = 1;      // flags detection status - goes to zero when time_r recorded
+      int delay = 0;
+      switch (pdet)  {
+        case 1:
+          delay = params.ddet[0];
+          break;
+        case 2:
+          delay = ceil(gsl_ran_gamma(r,params.ddet[0]/params.ddet[1],params.ddet[1])); // 0:mean 1:scale
+          break;
+        default:
+          delay = params.delaydet;
+          break;
+      }
+
+      // Actual loop here
+      while(ind<t_wend)  {
+        if ((iflag)&&( ninf.sum()>0 ))  { // FIXME threshold triggers detection delay
+          time_r[i] = t+ind+delay;        // So
+          time_c[i] = t+ind+delay+params.delayipc;
+          t_wend = ind+delay+params.delayipc;   // Shrink simulation end point
+          if (t_wend>tb_tmp.size())  {tb_tmp.resize(t_wend,0.0);}
+          iflag = 0;
+        }
+        // Calc rates and pop changes
+        Eigen::Vector2d rt = tau*nsus.cwiseProduct(beta*ninf.cwiseProduct(n1pop)); // t*S*beta*I/N
+        rate[0](0) = rt(0);
+        rate[1](0) = rt(1);
+        for (int spc=0;spc<2;++spc)  {
+          if (ptot(spc))  {
+            // Latent periods
+            for (int ii=1;ii<m_spc(spc)+1;++ii)  {
+              rate[spc](ii) = pops[spc](ii)*sigma_spc(spc)*tau;
+            }
+            // Infectious periods
+            for (int ii=m_spc(spc)+1;ii<m_spc(spc)+n_spc(spc)+1;++ii)  {
+              rate[spc](ii) = pops[spc](ii)*gamma_spc(spc)*tau;
+            }
+            // Population changes ~Pois(rates)
+            for (int ii=0;ii<m_spc(spc)+n_spc(spc)+1;++ii)  {
+              dpop[spc](ii) = floor(min(pops[spc](ii),int(gsl_ran_poisson(r,rate[spc](ii)))));
+            }
+          }
+        }
+        // Update!
+        for (int spc=0;spc<2;++spc)  {
+          pops[spc] = pops[spc] - dpop[spc];
+          for (int ii=1;ii<m_spc(spc)+n_spc(spc)+2;++ii)  {
+            pops[spc](ii) = pops[spc](ii) + dpop[spc](ii-1);
+          }
+        }
+        nsus(0) = pops[0](0);
+        nsus(1) = pops[1](0);
+        ninf(0) = pops[0].segment(m_spc(0)+1,n_spc(0)).sum();
+        ninf(1) = pops[1].segment(m_spc(1)+1,n_spc(1)).sum();
+        tt += tau;
+        // Re-bin for daily steps
+        if (trunc(tt)>ind)  {
+          tb_tmp[ind] = params.tb[farms.region[i]][0]*ninf(0) + params.tb[farms.region[i]][1]*ninf(1);
+          ++ind;
+        }
+      }
+      tblty[i] = tb_tmp;
+      if (iflag)  {
+        /*cout << "!";
+        cout << t << " " << delay << " " << time_r[i] << " " << time_c[i] << " " << ind << endl;
+        cout << ptot(0) << "\t" << seeds(0) << "\t" << m_spc(0) << "\t" << sigma_spc(0) << "\t" << n_spc(0) << "\t" << gamma_spc(0) << endl;
+        cout << ptot(1) << "\t" << seeds(1) << "\t" << m_spc(1) << "\t" << sigma_spc(1) << "\t" << n_spc(1) << "\t" << gamma_spc(1) << endl << endl;
+        cout << pops[0].transpose() << endl;
+        cout << pops[1].transpose() << endl;
+        cout << beta << endl;
+        cin.get();*/
+      }
+      else  {
+        HACKFLAG = 0;
+      }
+    }
+  }
+}
+/*void Model::within(int i)  {
   double tt = 0.0;                    // Time post-infection counter
   double tau = 0.1;                   // Discrete time step
   // Grab farm populations
-  int ncow = farms.N[i][0];
-  int nshp = farms.N[i][2];
-  if ((ncow+nshp)==0)  {
+  int totcow = farms.N[i][0];
+  int totshp = farms.N[i][2];
+  if ((totcow+totshp)==0)  {  // How the hell did it get infected then???
     time_r[i] = t+1;
     time_c[i] = t+1;
     // NOTE This catches one farm (66481) that only has pigs - infected during silent spread
     // otherwise... when rng gives exactly 0?
     if (i!=66481)  {
-      cout << "\t" << i << " " << t << " " << farms.N[i][0] << " " << farms.N[i][2] << " " << ncow << " " << nshp << "WTF" << endl;
+      cout << "\t" << i << " " << t << " " << farms.N[i][0] << " " << farms.N[i][2] << " " << totcow << " " << totshp << "WTF" << endl;
     }
   }
   else  {
-    double n1cow = farms.N1[i][0];
-    double n1shp = farms.N1[i][2];
-    // Initial infections - see Schley ModelInf09 effect vacc undetected persistence
-    // FIXME they're only for cows... but what to do with sheep?
-    double disp_r = 1.2;
-    double mu_cow = 4.21+0.00386*ncow;
-    double mu_shp = 4.21+0.00386*nshp;
-    int seedcow = 0;
-    while (seedcow==0)  {
-      seedcow = gsl_ran_negative_binomial(r,mu_cow/(disp_r+mu_cow),disp_r);
+    double disp_r = 1.12;               // Dispersion parameter
+    if (totcow)  {
+      double n1cow = farms.N1[i][0];
+      // Initial infections - see Schley ModelInf09 effect vacc undetected persistence
+      // FIXME they're only for cows... but what to do with sheep?
+      double mu_cow = 4.21+0.00386*totcow;  // Mean = pn/(1-n)
+      int seedcow = 0;
+      while (seedcow==0)  {
+        seedcow = gsl_ran_negative_binomial(r,mu_cow/(disp_r+mu_cow),disp_r);
+      }
+      int m_cow = floor(gsl_ran_gamma(r,params.latk_cow[0],params.latk_cow[1]));
+      int n_cow = max(int(floor(gsl_ran_gamma(r,params.infk_cow[0],params.infk_cow[1]))),1);
+      double sigma_cow = m_cow/gsl_ran_gamma(r,params.latm_cow[0],params.latm_cow[1]);
+      double gamma_cow = n_cow/gsl_ran_gamma(r,params.infm_cow[0],params.infm_cow[1]);
     }
-    int seedshp = 0;
-    while (seedshp==0)  {
-      seedshp = gsl_ran_negative_binomial(r,mu_shp/(disp_r+mu_shp),disp_r); // TODO check parameters
+    if (totshp)  {
+      double n1shp = farms.N1[i][2];
+      double mu_shp = 4.21+0.00386*totshp;
+      int seedshp = 0;
+      while (seedshp==0)  {
+        seedshp = gsl_ran_negative_binomial(r,mu_shp/(disp_r+mu_shp),disp_r); // TODO check parameters
+      }
     }
-    // Select a parameter set
-    int pcow = gsl_rng_uniform_int(r,params.m_cows.size());
-    int pshp = gsl_rng_uniform_int(r,params.m_shps.size());
-    // Grab parameters
-    int m_cow = params.m_cows[pcow];
-    int n_cow = params.n_cows[pcow];
-    int m_shp = params.m_shps[pshp];
-    int n_shp = params.n_shps[pshp];
-    double sigma_cow = params.sigma_cows[pcow];
-    double sigma_shp = params.sigma_shps[pshp];
-    double gamma_cow = params.gamma_cows[pcow];
-    double gamma_shp = params.gamma_shps[pshp];
+
+    // Generate E_m, I_n, transition and transmission rates
+    int m_shp = floor(gsl_ran_gamma(r,params.latk_shp[0],params.latk_shp[1]));
+    int n_shp = max(int(floor(gsl_ran_gamma(r,params.infk_shp[0],params.infk_shp[1]))),1);
+    double sigma_shp = m_shp/gsl_ran_gamma(r,params.latm_shp[0],params.latm_shp[1]);
+    double gamma_shp = n_shp/gsl_ran_gamma(r,params.infm_shp[0],params.infm_shp[1]);
     Eigen::Matrix2d beta;
-    beta << params.beta_cows[pcow], 0.06,
-             0.06, params.beta_shps[pshp];
+    beta << gsl_ran_gamma(r,params.beta_cow[0],params.beta_cow[1]) , 0.06 ,  // 0.06 from de Rueda
+            0.06 , gsl_ran_gamma(r,params.beta_shp[0],params.beta_shp[1]);  // Symmetrical?!
 
     // Populations
     Eigen::VectorXi pops_cow = Eigen::VectorXi::Zero(m_cow+n_cow+2);
-    pops_cow[1] = min(ncow,seedcow);    // Initial exposeds - limited by herd size
-    pops_cow[0] = ncow - pops_cow[1];
+    pops_cow[1] = min(totcow,seedcow);    // Initial exposeds - limited by herd size
+    pops_cow[0] = totcow - pops_cow[1];
 
     Eigen::VectorXi pops_shp = Eigen::VectorXi::Zero(m_shp+n_shp+2);
-    pops_shp[1] = min(nshp,seedshp);
-    pops_shp[0] = nshp - pops_shp[1];
+    pops_shp[1] = min(totshp,seedshp);
+    pops_shp[0] = totshp - pops_shp[1];
     // tau-step changes
     Eigen::VectorXi dpop_cow = Eigen::VectorXi::Zero(m_cow+n_cow+2);
     Eigen::VectorXi dpop_shp = Eigen::VectorXi::Zero(m_shp+n_shp+2);
@@ -620,8 +776,9 @@ void Model::within(int i)  {
 
     int ind = 1;        // day post infection - also index for tblty vector
     int t_wend = twmx-1;    // Time end of within-farm simulation
+    vector<double> tb_tmp(twmx,0.0);
     int iflag = 1;      // flags detection status - goes to zero when time_r recorded
-    int delay = 0;      // delay to cull
+    int delay = 0;      // delay to detection
     switch (pdet)  {
       case 1:
         delay = params.ddet[0];
@@ -633,15 +790,15 @@ void Model::within(int i)  {
         delay = params.delaydet;
         break;
     }
+    // Actual loop
     while (ind<t_wend)  {
       if ((iflag)&&( ((icow)+(ishp))>0 ))  { // FIXME threshold triggers detection delay
-        time_r[i] = t+ind;        // So
-        time_c[i] = t+ind+delay;
-        t_wend = ind+delay;   // Shrink simulation end point
+        time_r[i] = t+ind+delay;        // So
+        time_c[i] = t+ind+delay+params.delayipc;
+        t_wend = ind+delay+params.delayipc;   // Shrink simulation end point
         iflag = 0;
       }
-
-      if (ncow)  {
+      if (totcow)  {
         // Cows - Infections
         rate_cow[0] = tau*pops_cow[0]*( beta(0,0)*icow*n1cow+beta(0,1)*ishp*n1shp );
         // Cows - Latent periods
@@ -657,8 +814,7 @@ void Model::within(int i)  {
           dpop_cow[ii] = floor(min(pops_cow(ii),int(gsl_ran_poisson(r,rate_cow[ii]))));
         }
       }
-
-      if (nshp)  {
+      if (totshp)  {
         // Sheep - Infections
         rate_shp[0] = tau*pops_shp[0]*( beta(1,0)*icow*n1cow+beta(1,1)*ishp*n1shp );
         // Sheep - latent periods
@@ -674,16 +830,15 @@ void Model::within(int i)  {
           dpop_shp[ii] = floor(min(pops_shp(ii),int(gsl_ran_poisson(r,rate_shp[ii]))));
         }
       }
-
       // UPDATE
-      if (ncow)  {
+      if (totcow)  {
         pops_cow -= dpop_cow;
         for (int ii=1;ii<m_cow+n_cow+2;++ii)  {
           pops_cow[ii] = pops_cow[ii] + dpop_cow[ii-1];
         }
         icow = pops_cow.segment(m_cow+1,n_cow).sum();
       }
-      if (nshp)  {
+      if (totshp)  {
         pops_shp -= dpop_shp;
         for (int ii=1;ii<m_shp+n_shp+2;++ii)  {
           pops_shp[ii] = pops_shp[ii] + dpop_shp[ii-1];
@@ -691,20 +846,25 @@ void Model::within(int i)  {
         ishp = pops_shp.segment(m_shp+1,n_shp).sum();
       }
       tt += tau;
-
       // Re-bin for daily steps
       if (trunc(tt)>ind)  {
-        tblty[i][ind] = params.tb[farms.region[i]][0]*icow + params.tb[farms.region[i]][2]*ishp;
+        tb_tmp[ind] = params.tb[farms.region[i]][0]*icow + params.tb[farms.region[i]][2]*ishp;
         ++ind;
       }
     }
+    tblty[i] = tb_tmp;
     if (iflag)  {
-      cout << t << " " << i << " " << seedshp << " " << nshp << " " << m_shp << " " << sigma_shp << " " << n_shp << " " << gamma_shp << endl;
-      cout << pops_shp << endl;
+      cout << "\n";
+      cout << t << " " << delay << " " << time_r[i] << " " << time_c[i] << " " << ind << " " << i << endl;
+      cout << seedcow << " " << totcow << " " << m_cow << " " << sigma_cow << " " << n_cow << " " << gamma_cow << endl;
+      cout << pops_cow.transpose() << endl;
+      cout << seedshp << " " << totshp << " " << m_shp << " " << sigma_shp << " " << n_shp << " " << gamma_shp << endl;
+      cout << pops_shp.transpose() << endl;
+      cout << beta << endl;
       cin.get();
     }
   }
-}
+}*/
 
 
 /** \brief Get transmissibility of farm i at time t
@@ -815,7 +975,7 @@ void Model::resetsim()  {
  */
 void Model::error_calc()  {
   // TODO Eigen-ise this shit.
-  if (G_CONST::err_d_c)  {
+  if (G_CONST::err_d_c)  {  // if daily
     fill(ninfd.begin(),ninfd.end(),0);
     fill(nculd.begin(),nculd.end(),0);
     for (int reg=0;reg<farms.enreg;++reg)  {
@@ -828,18 +988,14 @@ void Model::error_calc()  {
       case 0:   // Nothing changes (most likely)
       break;
 
-      case 1:   // Infection (don't need to do anything)
-        ++ninfd[farms.eregion[i]];
-        infd[farms.eregion[i]][0] += farms.N[i][0];
+      case 1:   // Infection
+        ++ninfd[farms.eregion[i]];                    // Infected Farm
+        infd[farms.eregion[i]][0] += farms.N[i][0];   // Infected cattle
         //infd[farms.eregion[i]][1] += farms.N[i][1];
-        infd[farms.eregion[i]][2] += farms.N[i][2];
+        infd[farms.eregion[i]][2] += farms.N[i][2];   // Infected sheep
       break;
 
       case 2:   // IP reported
-//        ++ninfd[farms.region[i]];
-        /*infd[farms.region[i]][0] += farms.N[i][0];
-        infd[farms.region[i]][1] += farms.N[i][1];
-        infd[farms.region[i]][2] += farms.N[i][2];*/
       break;
 
       case 3:   // DC/CP notified. Only want actuals here.
@@ -850,7 +1006,6 @@ void Model::error_calc()  {
       break;
 
       case 5:   // Culling IP
-        // IPs already counted when infected, obv will be culled
       break;
 
       case 6:   // Culling DC/CP - are required here for total number of culls
@@ -906,14 +1061,12 @@ void Model::vaccinate(int i)  {
 
 
 /** \brief Generates a starting sample for whatever. Rerun from Chain/Smc until ready
- * \param r gsl_rng*
  * \param ready int&
  * \return Eigen::VectorXd
  */
 Eigen::VectorXd Model::init_samp(int& ready)  {
   // TODO "ready" was holdover from old code...
   params.setrand(r);
-  //params.setacc();
   ready = 1;
   return(params.par_vec);
 }
@@ -952,6 +1105,9 @@ Eigen::VectorXd Model::errcalc()  {
  */
 void Model::parse(const Eigen::VectorXd& v)  {
   params.parse(v);
+  if (params.rwfm&&(params.pwfm==0))  { // Running wfm from trn exp, not fitting here
+    params.wfm_samp(r);
+  }
 }
 
 

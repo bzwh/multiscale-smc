@@ -43,8 +43,7 @@ Smc::Smc(int nc,int nn,int ss,Farms& frms)  {
   r.resize(nthreads);
   for (int cno=0;cno<nthreads;++cno)  {
     r[cno] = gsl_rng_alloc(gsl_rng_mt19937);
-    //gsl_rng_set(r[cno],(cno+1.0)*time(0));
-    gsl_rng_set(r[cno],1);
+    gsl_rng_set(r[cno],(cno+1.0)*time(0));
   }
   N = nn;
   nround = ss;
@@ -62,11 +61,10 @@ Smc::Smc(int nc,int nn,int ss,Farms& frms)  {
   means.resize(npar);
   sigma = MatrixXd::Zero(npar,npar);
   tolerance.resize(nmet);
-  //tolerance.fill(0.17);
-  tolerance << 0.105,0.165,0.180,0.140,0.08;
+  tolerance.fill(10.0);
+  //tolerance << 0.105,0.165,0.180,0.140,0.08;
   epsilons = MatrixXd::Zero(N,nmet);
   step = 0;
-
 }
 
 /*
@@ -102,10 +100,10 @@ void Smc::run()  {
 
 
 /** \brief Dump state after each round
- * \param dat ofstream& For particles
- * \param eps ofstream& For metric values
- * \param wht ofstream& Particle weights
- * \param sig ofstream& Dump particle means and (component-wise) variances
+ * \param dat ofstream & For particles
+ * \param eps ofstream & For metric values
+ * \param wht ofstream & Particle weights
+ * \param sig ofstream & Dump particle means and (component-wise) variances
  * \return void
  */
 void Smc::write(ofstream& dat, ofstream& eps, ofstream& wht, ofstream& sig)  {
@@ -162,7 +160,7 @@ void Smc::gen(int i,int cno)  {
     lstream.str(string());*/
     models[cno].parse(particles_new.row(i));
     pcheck = models[cno].params.prior_check();  // 0 for all good
-    cout << pcheck << flush;
+    //cout << pcheck << flush;
   }
 }
 
@@ -227,6 +225,7 @@ void Smc::update()  {
         w_sum += weights_old(j)*pert_dens(i,j);
       }
       weights_new[i] = 1.0/w_sum; // Flat priors already adhered to in gen
+      // FIXME Gamma distributed priors for within-farm. Where to specify requirement?
     }
   }
   // Normalise
