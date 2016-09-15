@@ -254,11 +254,11 @@ int Model::runsim() {
       for (int ii=0;ii<farms.enreg;++ii)  {
         fill(ertot[ii].begin(),ertot[ii].end(),1.0e10);
       }
-      cout << "B" << flush;
+      //cout << "B" << flush;
       return(0);  // reject
     }
   }
-  cout << "ITOT(" << Itot << ")" << endl;
+  //cout << "ITOT(" << Itot << ")" << endl;
   return(1);      // accept
 }
 

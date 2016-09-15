@@ -35,7 +35,7 @@ Params::Params()  {
     pdet = G_CONST::fit_det ? 2 : 0; // Fitting ~gamma(u,k)
     pdcs = G_CONST::fit_dcs;         // 2-dist, 1-const, 0-nope
     pdcf = G_CONST::fit_dcf;         // Fitting DC f accuracy
-    pwfm = G_CONST::fit_msc ?10 : 0;// Fitting within-farm model parameters
+    pwfm = G_CONST::fit_msc ?12 : 0;// Fitting within-farm model parameters
     rwfm = G_CONST::multisc;         // 1: Within farm SEmInR model  0: Step function
 
     pper = (plaw) ? 7 : 3;   // number of regionalised parameters (sus and trans, no powerlaws)
@@ -102,6 +102,7 @@ Params::Params()  {
     vaccrange.resize(2,0.0);
     vaccrange[1] = 5.0;
   }
+  pri = 0.0;
 }
 
 
@@ -339,9 +340,9 @@ void Params::setrand(gsl_rng* r)  {
     mI[0] = gsl_ran_gamma(r,infm[0][0],infm[0][1]);
     mI[1] = gsl_ran_gamma(r,infm[1][0],infm[1][1]);
     bt[0][0] = gsl_ran_gamma(r,beta[0][0],beta[0][1]);
-    bt[0][1] = 0.06;
+    bt[0][1] = gsl_ran_gamma(r,10.0,0.006);// // err what?
     bt[1][1] = gsl_ran_gamma(r,beta[1][0],beta[1][1]);
-    bt[1][0] = 0.06;
+    bt[1][0] = gsl_ran_gamma(r,10.0,0.006); // mean is based on de rueda, very informative...?
   }
   // TODO clean this up - populating par Eigen::VectorXd
   int iblah = 0;
@@ -372,6 +373,8 @@ void Params::setrand(gsl_rng* r)  {
     par_vec[iblah++] = mI[0];
     par_vec[iblah++] = mI[1];
     par_vec[iblah++] = bt[0][0];
+    par_vec[iblah++] = bt[0][1];
+    par_vec[iblah++] = bt[1][0];
     par_vec[iblah++] = bt[1][1];
   }
   //(iblah==pnum) ? cout<<"!"<<endl : cout<<"WTF"<<endl; // checking right number of parameters...
@@ -475,9 +478,8 @@ void Params::setacc()  {
   if (pdcf)  {
     par_vec[iblah++] = f;
   }
+  // TODO the WFM parameters
 }
-
-
 
 
 /** \brief Parse the vector of parameters in to named fields
@@ -521,6 +523,8 @@ void Params::parse(const VectorXd& v)  {
     mI[0] = v[i++];
     mI[1] = v[i++];
     bt[0][0] = v[i++];
+    bt[0][1] = v[i++];
+    bt[1][0] = v[i++];
     bt[1][1] = v[i++];
   }
   // TODO allow for delays and control parameters
@@ -617,6 +621,23 @@ int Params::prior_check()  {
       return(-7);
     }
   }
+  // Fitting WFM parameters
+  pri = 0.0;
+  if (pwfm)  {
+    for (int spc=0;spc<2;++spc)  {
+      pri += log(gsl_ran_gamma_pdf(kE[spc],latk[spc][0],latk[spc][1]));
+      pri += log(gsl_ran_gamma_pdf(mE[spc],latm[spc][0],latm[spc][1]));
+      pri += log(gsl_ran_gamma_pdf(kI[spc],infk[spc][0],infk[spc][1]));
+      pri += log(gsl_ran_gamma_pdf(mI[spc],infm[spc][0],infm[spc][1]));
+      pri += log(gsl_ran_gamma_pdf(bt[spc][spc],beta[spc][0],beta[spc][1]));
+    }
+    pri += log(gsl_ran_gamma_pdf(bt[0][1],10.0,0.006));
+    pri += log(gsl_ran_gamma_pdf(bt[1][0],10.0,0.006));
+  }
+  if (std::isinf(pri))  {
+    return(-9);
+  }
+  pri = exp(pri);
   return(0);  // All within whatever bounds you've decided....
 }
 

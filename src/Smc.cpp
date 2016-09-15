@@ -56,6 +56,7 @@ Smc::Smc(int nc,int nn,int ss,Farms& frms)  {
   nmet = frms.enreg;                 // Number of metrics to test against...
   particles_old = MatrixXd::Zero(N,npar);
   particles_new = MatrixXd::Zero(N,npar);
+  priors.resize(N);
   weights_old.resize(N);
   weights_new.resize(N);
   means.resize(npar);
@@ -129,6 +130,7 @@ void Smc::iterate()  {
       runmodel(i,cno);
       acc = test(i,cno);
     }
+    priors(i) = models[cno].params.pri;
     lstream.str(string());
   }
 }
@@ -224,7 +226,7 @@ void Smc::update()  {
       for (int j=0;j<N;++j)  {
         w_sum += weights_old(j)*pert_dens(i,j);
       }
-      weights_new[i] = 1.0/w_sum; // Flat priors already adhered to in gen
+      weights_new[i] = priors(i)/w_sum; // Flat priors already adhered to in gen
       // FIXME Gamma distributed priors for within-farm. Where to specify requirement?
     }
   }

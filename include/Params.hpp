@@ -29,6 +29,7 @@ public:
   void load_transmission();         //!< Load transmission outputs for within-farm model
   void wfm_samp(gsl_rng*);
 
+  double pri;
   // DATA
   int pnum; //!< Total number of parameters being fitted
   int nreg; //!< # regional parameter sets (just fitting 1 set!)

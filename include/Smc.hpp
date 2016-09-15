@@ -26,6 +26,7 @@ public:
   std::vector<Model> models;                  /// Model, duh.
   Eigen::MatrixXd particles_old;              /// Vector of particles/parameter vectors
   Eigen::MatrixXd particles_new;              /// Particle proposal
+  Eigen::VectorXd priors;                     /// Prior probs of accepted particles
   Eigen::VectorXd weights_old;                /// Old weights for each particle
   Eigen::VectorXd weights_new;                /// Temp storage of new weights, for normalising
   Eigen::VectorXd tolerance;                  /// For each metric, to be shrunk with each step
