@@ -331,18 +331,7 @@ void Params::setrand(gsl_rng* r)  {
     F[0] = 6.0;
   }
   if (rwfm)  {
-    kE[0] = gsl_ran_gamma(r,latk[0][0],latk[0][1]);
-    kE[1] = gsl_ran_gamma(r,latk[1][0],latk[1][1]);
-    mE[0] = gsl_ran_gamma(r,latm[0][0],latm[0][1]);
-    mE[1] = gsl_ran_gamma(r,latm[1][0],latm[1][1]);
-    kI[0] = gsl_ran_gamma(r,infk[0][0],infk[0][1]);
-    kI[1] = gsl_ran_gamma(r,infk[1][0],infk[1][1]);
-    mI[0] = gsl_ran_gamma(r,infm[0][0],infm[0][1]);
-    mI[1] = gsl_ran_gamma(r,infm[1][0],infm[1][1]);
-    bt[0][0] = gsl_ran_gamma(r,beta[0][0],beta[0][1]);
-    bt[0][1] = gsl_ran_gamma(r,10.0,0.006);// // err what?
-    bt[1][1] = gsl_ran_gamma(r,beta[1][0],beta[1][1]);
-    bt[1][0] = gsl_ran_gamma(r,10.0,0.006); // mean is based on de rueda, very informative...?
+    wfm_samp(r);
   }
   // TODO clean this up - populating par Eigen::VectorXd
   int iblah = 0;
@@ -552,9 +541,9 @@ void Params::wfm_samp(gsl_rng* r)  {
   mI[0] = gsl_ran_gamma(r,infm[0][0],infm[0][1]);     // 2 species' infectious mean
   mI[1] = gsl_ran_gamma(r,infm[1][0],infm[1][1]);
   bt[0][0] = gsl_ran_gamma(r,beta[0][0],beta[0][1]);  // Inter/intra species transmission rates
-  bt[0][1] = 0.06;
+  bt[0][1] = gsl_ran_gamma(r,10.0,0.006);// // err what?
   bt[1][1] = gsl_ran_gamma(r,beta[1][0],beta[1][1]);
-  bt[1][0] = 0.06;
+  bt[1][0] = gsl_ran_gamma(r,10.0,0.006); // mean is based on de rueda, very informative...?
 }
 
 // Should these checks be going in Chain? Not nec for rejection sampling
