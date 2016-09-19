@@ -9,7 +9,7 @@ namespace G_CONST  {
 
   const int fit_reg = 1;   // How many parameter sets
   const int fit_plw = 0;   // Linear scaling for Sus & Trans
-  const int fit_spc = 3;   // Cows, pigs and sheep. Though pigs are quietly ignored... FIXME!
+  const int fit_spc = 2;   // Cows, pigs and sheep. Though pigs are quietly ignored... FIXME!
   const int fit_ker = 1;   // Flag - fit kernel parameters
   const int fit_det = 1;   // Fit gamma distribution to detection delay. 0:constant, 1:gamma
   const int fit_dcs = 2;   // Time-invariant or some functional form or not fitting at all? 2:dist,1:const,0:off

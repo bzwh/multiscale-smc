@@ -91,8 +91,8 @@ void Farms::loadfarms()  {
   if (fdat.is_open())  {
     ncnt = std::count(std::istreambuf_iterator<char>(fdat),
                       std::istreambuf_iterator<char>(),'\n'); // This many newlines==farms (I hope)
-    N.resize(ncnt,vector<int>(3,0));
-    N1.resize(ncnt,vector<double>(3,1.0));  // inverses... don't want accidental zero-div
+    N.resize(ncnt,vector<int>(G_CONST::fit_spc,0));
+    N1.resize(ncnt,vector<double>(G_CONST::fit_spc,1.0));  // inverses... don't want accidental zero-div
     x.resize(ncnt,-1.0);      // default to off map?
     y.resize(ncnt,-1.0);
     region.resize(ncnt,0);    // default to all region 0, if fitting more, then read.
@@ -100,22 +100,16 @@ void Farms::loadfarms()  {
     cps.resize(ncnt);         // farm ids are push_back'd in to this
     fdat.clear();             // reset eof and..
     fdat.seekg(0,ios::beg);   //   ... jump back to beginning of file
-    int reg,n0,n1,n2;         // temp storage vars to put in to the vectors
-    double xx,yy,n10,n11,n12; // temp storage for location and inverse livestock numbers
+    double reg,n0,n1;         // temp storage vars to put in to the vectors
+    double xx,yy,n10,n11;     // temp storage for location and inverse livestock numbers
     for (int i=0;i<ncnt;++i)  { // Takes first ncnt lines from file
       //fdat >> farms.region[i] >> farms.x[i] >> farms.y[i] >> farms.N[i][0] >> farms.N[i][1] >> farms.N[i][2] >> farms.N1[i][0] >> farms.N1[i][1] >> farms.N[i][2];
-      fdat >> reg >> xx >> yy >> n0 >> n1 >> n2 >> n10 >> n11 >> n12;
-      eregion[i]=reg; x[i] = xx; y[i]=yy;
-      N[i][0] = n0;
-      N[i][1] = n1;
-      N[i][2] = n2;
-      //N1[i][0] = (N[i][0]) ? 1.0/double(N[i][0]) : 1.0;
-      //N1[i][1] = (N[i][1]) ? 1.0/double(N[i][1]) : 1.0;
-      //N1[i][2] = (N[i][2]) ? 1.0/double(N[i][2]) : 1.0;
+      fdat >> reg >> xx >> yy >> n0 >> n1 >> n10 >> n11 ;
+      eregion[i]=int(round(reg)); x[i] = xx; y[i]=yy;
+      N[i][0] = int(round(n0));
+      N[i][1] = int(round(n1));
       N1[i][0] = n10;
       N1[i][1] = n11;
-      N1[i][2] = n12;
-      //cout << farms.region[i]<<endl;
     }
     fdat.close();
     if (G_CONST::fit_reg==5)  {
