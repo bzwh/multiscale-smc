@@ -7,6 +7,7 @@ pth = 'D:/Ben/Dropbox/ms-smc/mallorn-complex/';
 pth = 'D:/Ben/Dropbox/ms-smc/outputs/';
 %pth = './mallorn-/';
 %pth = './outputs/';
+pth = './mallorn-wfit/';
 pth = './mallorn-wfm/';
 %pth = 'n:/mathematical Biology/private/staff folders/ben/outputs/ms-smc/outputs/';
 dfiles = dir([pth 'dat*txt' ]);
@@ -30,9 +31,9 @@ wht = load([pth 'wht.txt']);
 %% Particle distributions
 m=2;
 n=2;
-nreg=1;
+nreg=5;
 nparam = 7;%size(pall,2);
-nrp = (size(pars{1},2)-nparam)/nreg;
+nrp = 3;%(size(pars{1},2)-nparam)/nreg;
 %       Sus    trans      Ker       Delay  DCs  
 kmin = [0  ,0 ,0   ,0   , 0  ,1     ,0 ,0, 1.5,0.0, 0.75];
 kmax = [250,30,1e-4,1e-5, 2.5,12.5  ,15,5, 5.5,0.025, 1];
@@ -114,6 +115,90 @@ axis off
 legend(lg)
 saveas(gcf,[pth 'pars-dens_others.png'])
 close()
+%% WFM
+m=2;n=2;
+II=[1,2,3,4];
+prc = load('../../data/uk/wfm-cows.txt');
+figure('outerposition',[0,0,1920,1080],'visible','off')
+lbls = {'kE','mE','kI','mI'};
+for i=1:4
+  subplot(m,n,II(i))
+  hold all
+  for rn=1:nrnd
+    pall = pars{rn};
+    [k,fd] = mykerest(pall(:,end-13+i*2));%,kmin(i+1),kmax(i+1));
+    l=plot(k,pdf(fd,k),'Color',cc(rn,:),'linewidth',lw);
+    l.Color(4)=(1-cfd)*rn/nrnd+cfd;
+    plot(k,gampdf(k,prc(i,1),prc(i,2)),'c:')
+  end
+  xlabel(lbls{i})
+end
+subplot(m,n,m*n)
+hold all
+lg = {};
+for i=1:nrnd
+  %plot(0,i,'color',cc(i,:),'linewidth',2)
+  lg{i}=num2str(i);
+end
+%axis off
+legend(lg)
+saveas(gcf,[pth 'pars-dens_wfmc.png'])
+close()
+% Sheep--------------------------------------------------------------------
+prs = load('../../data/uk/wfm-lamb.txt');
+figure('outerposition',[0,0,1920,1080],'visible','off')
+lbls = {'kE','mE','kI','mI'};
+for i=1:4
+  subplot(m,n,II(i))
+  hold all
+  for rn=1:nrnd
+    pall = pars{rn};
+    [k,fd] = mykerest(pall(:,end-12+i*2));%,kmin(i+1),kmax(i+1));
+    l=plot(k,pdf(fd,k),'Color',cc(rn,:),'linewidth',lw);
+    l.Color(4)=(1-cfd)*rn/nrnd+cfd;
+    plot(k,gampdf(k,prs(i,1),prs(i,2)),'c:')
+  end
+  xlabel(lbls{i})
+end
+subplot(m,n,m*n)
+hold all
+lg = {};
+for i=1:nrnd
+  %plot(0,i,'color',cc(i,:),'linewidth',2)
+  lg{i}=num2str(i);
+end
+%axis off
+legend(lg)
+saveas(gcf,[pth 'pars-dens_wfms.png'])
+close()
+% Transmission rate--------------------------------------------------------
+prb = [prc(end,:) ; [10,0.006];[10,0.006];prs(end,:)];
+figure('outerposition',[0,0,1920,1080],'visible','off')
+lbls={'Cow to cow','Sheep to cow','Cow to sheep','Sheep to sheep'};
+for i=1:4
+  subplot(m,n,II(i))
+  hold all
+  for rn=1:nrnd
+    pall = pars{rn};
+    [k,fd] = mykerest(pall(:,end-4+i));%,kmin(i+1),kmax(i+1));
+    l=plot(k,pdf(fd,k),'Color',cc(rn,:),'linewidth',lw);
+    l.Color(4)=(1-cfd)*rn/nrnd+cfd;
+    plot(k,gampdf(k,prb(i,1),prb(i,2)),'c:')
+    xlabel(lbls{i});
+  end
+end
+subplot(m,n,m*n)
+hold all
+lg = {};
+for i=1:nrnd
+  %plot(0,i,'color',cc(i,:),'linewidth',2)
+  lg{i}=num2str(i);
+end
+%axis off
+legend(lg)
+saveas(gcf,[pth 'pars-dens_wfmb.png'])
+close()
+
 %%
 figure('outerposition',[0,0,1920,1080])
 lbls = {'Sus_{cow}','Trans_{cow}','Trans_{sheep}','K_r','K_a','Delay_\mu','Delay_\theta','F_A','F_B','f'};
