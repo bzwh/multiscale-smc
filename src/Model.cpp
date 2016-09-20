@@ -131,16 +131,14 @@ void Model::sus_calc()  {
     for (int i=0;i<N;++i)  {
       int reg = farms.region[i];
       sus[i] = params.sb[reg][0]*pow(farms.N[i][0],params.sp[reg][0])
-             //+ params.sb[reg][1]*pow(farms.N[i][1],params.sp[reg][1])
-             + params.sb[reg][2]*pow(farms.N[i][2],params.sp[reg][2]);
+             + params.sb[reg][1]*pow(farms.N[i][1],params.sp[reg][1]);
     }
   }
   else  {
     for (int i=0;i<N;++i)  {
       int reg = farms.region[i];
       sus[i] = params.sb[reg][0]*farms.N[i][0]
-             //+ params.sb[reg][1]*farms.N[i][1]  // FIXME cows+sheep not pigs
-             + params.sb[reg][2]*farms.N[i][2];
+             + params.sb[reg][1]*farms.N[i][1];
     }
   }
 }
@@ -347,7 +345,9 @@ void Model::detrepcul()  {
       switch (states[i])  {
         case 1: // Detected IP
           dstate[i] = 2;
-          dccull(i);
+          if (G_CONST::dc_cull)  {
+            dccull(i);
+          }
           if (G_CONST::cp_cull)  {
             cpcull(i);
           }
@@ -539,8 +539,7 @@ void Model::without(int ifarm)  {
   }
   else  {
     tt = params.tb[reg][0]*farms.N[ifarm][0]
-       + params.tb[reg][1]*farms.N[ifarm][1]
-       + params.tb[reg][2]*farms.N[ifarm][2];
+       + params.tb[reg][1]*farms.N[ifarm][1];
   }
   // a huge time difference with this unrolled loop. but not as general re #species? jsut leave all in and suppress params
 
@@ -560,8 +559,8 @@ void Model::within(int i)  {
   int HACKFLAG = 1;
   Eigen::Vector2d ptot = Eigen::Vector2d::Zero();
   Eigen::Vector2d n1pop(1.0,1.0);  // Inverse of population...
-  ptot << farms.N[i][0],farms.N[i][2];
-  n1pop << farms.N1[i][0],farms.N1[i][2];
+  ptot << farms.N[i][0],farms.N[i][1];
+  n1pop << farms.N1[i][0],farms.N1[i][1];
   if (ptot.sum()==0)  {  // How the hell did it get infected then???
     time_r[i] = t+1;
     time_c[i] = t+1;
@@ -718,7 +717,7 @@ void Model::within(int i)  {
 inline
 double Model::trans(int i)  {
   if (t>time_c[i])  {
-    cout << t << " " << i << " " << time_i[i] << " " << time_r[i] << " " << time_c[i] << " " << states[i] << " " << farms.N[i][0] << " " << farms.N[i][2] << " siadfhaksjm" << endl;
+    cout << t << " " << i << " " << time_i[i] << " " << time_r[i] << " " << time_c[i] << " " << states[i] << " " << farms.N[i][0] << " " << farms.N[i][1] << " siadfhaksjm" << endl;
     exit(-1);
   }
   else  {
@@ -835,8 +834,7 @@ void Model::error_calc()  {
       case 1:   // Infection
         ++ninfd[farms.eregion[i]];                    // Infected Farm
         infd[farms.eregion[i]][0] += farms.N[i][0];   // Infected cattle
-        //infd[farms.eregion[i]][1] += farms.N[i][1];
-        infd[farms.eregion[i]][2] += farms.N[i][2];   // Infected sheep
+        infd[farms.eregion[i]][1] += farms.N[i][1];   // Infected sheep
       break;
 
       case 2:   // IP reported
@@ -855,8 +853,7 @@ void Model::error_calc()  {
       case 6:   // Culling DC/CP - are required here for total number of culls
         ++nculd[farms.eregion[i]];
         culd[farms.eregion[i]][0] += farms.N[i][0];
-        //culd[farms.eregion[i]][1] += farms.N[i][1];
-        culd[farms.eregion[i]][2] += farms.N[i][2];
+        culd[farms.eregion[i]][1] += farms.N[i][1];
       break;
     }
   }
@@ -866,10 +863,10 @@ void Model::error_calc()  {
     // On regional basis and normalised by metric value on day tmax
     double dninfd = (ninfd[reg]  -farms.farmsi[reg][t])*norm_fi[reg];
     double dinfdc = (infd[reg][0]-farms.cowssi[reg][t])*norm_ci[reg];
-    double dinfds = (infd[reg][2]-farms.sheepi[reg][t])*norm_si[reg];
+    double dinfds = (infd[reg][1]-farms.sheepi[reg][t])*norm_si[reg];
     double dnculd = (nculd[reg]  -farms.farmsc[reg][t])*norm_fc[reg];
     double dculdc = (culd[reg][0]-farms.cowssc[reg][t])*norm_cc[reg];
-    double dculds = (culd[reg][2]-farms.sheepc[reg][t])*norm_sc[reg];
+    double dculds = (culd[reg][1]-farms.sheepc[reg][t])*norm_sc[reg];
     //cout << ninfd[reg]-farms.farmsi[reg][t] << " ";// << ninfd[reg] << " ";
     ertot[reg][0] = ertot[reg][0] + dninfd*dninfd;
     ertot[reg][1] = ertot[reg][1] + dinfdc*dinfdc;

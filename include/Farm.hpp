@@ -41,7 +41,7 @@ class Farms  {
     void bigload();       //!< Just calls the rest of these. what's the point? i don't really know
     void loadfarms();     //!< Read demography data from file
     void loadcps();       //!< Read farms' contiguous premises from file
-    void loadseeds(int);  //!< Read first t days of epidemic to seed simulation
+    void loadseeds();     //!< Read first t days of epidemic to seed simulation
     void loaderrdat();    //!< Read fit metric values. Cumulative or Daily?
     void dumpfarms();
 

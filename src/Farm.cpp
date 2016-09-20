@@ -17,10 +17,10 @@ Farms::Farms()  {
   // NOTE INPUT DATA PATH
   #ifdef _WIN32_WINNT
     // Make relative???
-    datapath = "D:/Ben/data/uk/";
+    datapath = "D:/Ben/data/jp/";
   #endif // _WIN32_WINNT
   #ifdef __linux__
-    datapath = "../../data/uk/";
+    datapath = "../../data/jp/";
   #endif // __linux__
 
   // NOTE INPUT DATA FILENAMES: demography, CPs, infection/cull seeds, fit metric
@@ -64,7 +64,7 @@ void Farms::bigload()  { // hahaha.
     loadcps();
   }
   cout << "Loading seeds: " + whdat << "\t" << flush;
-  loadseeds(G_CONST::seedday); // (t=1) == (Feb 1st)
+  loadseeds(); // (t=1) == (Feb 1st)
   cout <<   seedfarms.size() << endl;
   cout << "Loading metric: " + erdat << flush;
   loaderrdat();
@@ -181,11 +181,10 @@ void Farms::loadcps()  {
  *  \param tmax int - date to seed epidemic
  *  \return void
  */
-void Farms::loadseeds(int tmax)  {
+void Farms::loadseeds()  {
+  int tmax = G_CONST::seedday;
   ifstream ipdat;
   ifstream dcdat;
-
-  // TODO check JPN complies to format. UK dates are fine.
   ipdat.open(whdat.data()); // confirmed infected
   dcdat.open(cldat.data()); // pre-emptively culled
   // Here be the infected farms
@@ -196,7 +195,6 @@ void Farms::loadseeds(int tmax)  {
   if (ipdat.is_open())  {
     while (1)  {
       ipdat >> seedf >> seedt;
-      seedt += 4; // NOTE Rescale to t=1 == Feb 1st.  File has: t=2 == 6th Feb.
       if (seedt>tmax)  {
         break;
       }
@@ -218,7 +216,6 @@ void Farms::loadseeds(int tmax)  {
   if (dcdat.is_open())  {
     while (1)  {
       dcdat >> seedf >> seedt;
-      seedt += 9; // NOTE Rescale to t=1 == Feb 1st. File: t=13 == 22nd Feb
       if (seedt>tmax)  {
         break;
       }
@@ -245,7 +242,8 @@ void Farms::loaderrdat()  {
   // Storage for cumulative numbers of infections and culls. 01/02-23/12
   // reads in entirety of outbreak.
   // 326 obv for uk outbreak. lots of extra(empty) space when jpn
-  int real_epi_t_end = 326; // FIXME hardcoded end of file ish
+  //int real_epi_t_end = 326; // FIXME hardcoded end of file ish
+  int real_epi_t_end = 58; // FIXME hardcoded end of file ish
   farmsi = vector< vector<int> >(enreg,vector<int>(real_epi_t_end,0));
   farmsc = vector< vector<int> >(enreg,vector<int>(real_epi_t_end,0));
   cowssi = vector< vector<int> >(enreg,vector<int>(real_epi_t_end,0));
@@ -282,7 +280,7 @@ void Farms::loaderrdat()  {
     rd.close();
   }
   else  {
-    cout << "Failed reading in cumulative outbreak data!" << endl;
+    cout << "Failed reading in outbreak data!" << endl;
     exit(-1);
   }
 }

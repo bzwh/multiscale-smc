@@ -49,8 +49,7 @@ Params::Params()  {
       fill(sus_max[reg].begin(),sus_max[reg].end(),30.0);
       fill(trn_min[reg].begin(),trn_min[reg].end(),0.0);
       trn_max[reg][0] = 1.0e-4;//1.0e-3;
-      trn_max[reg][1] = 1.0; // Who cares right now?
-      trn_max[reg][2] = 1.0e-5;//1.0e-4;
+      trn_max[reg][1] = 1.0e-4;//1.0e-4;
       //fill(trn_max[reg].begin(),trn_max[reg].end(),1.0e-4);
     }
     // Kernel priors
@@ -300,11 +299,9 @@ cout << "HELLO!" << endl;
 void Params::setrand(gsl_rng* r)  {
   for (int reg=0;reg<nreg;++reg)  {
     sb[reg][0] = gsl_ran_flat(r,sus_min[reg][0],sus_max[reg][0]);
-    sb[reg][1] = 0.00001;
-    sb[reg][2] = 1.0; // Sus_sheep = 1.0;
+    sb[reg][1] = 1.0; // Sus_sheep = 1.0;
     tb[reg][0] = gsl_ran_flat(r,trn_min[reg][0],trn_max[reg][0]);
-    tb[reg][1] = 0.00001;
-    tb[reg][2] = gsl_ran_flat(r,trn_min[reg][2],trn_max[reg][2]);
+    tb[reg][1] = gsl_ran_flat(r,trn_min[reg][1],trn_max[reg][1]);
   }
   if (pker)  {
     ker[0] = gsl_ran_flat(r,ker_min[0],ker_max[0]);
@@ -338,7 +335,7 @@ void Params::setrand(gsl_rng* r)  {
   for (int reg=0;reg<nreg;++reg)  {
     par_vec[iblah++] = sb[reg][0];
     par_vec[iblah++] = tb[reg][0];
-    par_vec[iblah++] = tb[reg][2];
+    par_vec[iblah++] = tb[reg][1];
   }
   for(int i=0;i<pker;++i)  {
     par_vec[iblah++] = ker[i];
@@ -482,12 +479,12 @@ void Params::parse(const VectorXd& v)  {
     // TODO may well work, but only for 1 region. needs splitting for S_sheep. reg*pper?
     sb[reg][0] = v[i++];
     tb[reg][0] = v[i++];
-    tb[reg][2] = v[i++];
+    tb[reg][1] = v[i++];
     if (plaw)  {
       sp[reg][0] = v[i++];
       sp[reg][2] = v[i++];
       tp[reg][0] = v[i++];
-      tp[reg][2] = v[i++];
+      tp[reg][1] = v[i++];
     }
   }
   for (int k=0;k<pker;++k)  { // if not fitting kernel, pker==0
