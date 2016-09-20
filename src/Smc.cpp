@@ -1,4 +1,5 @@
 #include <iostream>
+#include <iomanip>
 #include <string>
 #include <fstream>
 #include <sstream>
@@ -31,6 +32,8 @@ using std::pow;
 using std::exp;
 using std::stringstream;
 using std::string;
+using std::setfill;
+using std::setw;
 
 /** \brief Constructor.
  * \param nc int Number of threads.
@@ -84,8 +87,12 @@ void Smc::run()  {
   ofstream wht("./outputs/wht.txt");
   ofstream sig("./outputs/sig.txt");
   for (step=0;step<nround;++step)  {
-    ofstream dat("./outputs/dat"+to_string(step)+".txt");
-    ofstream eps("./outputs/err"+to_string(step)+".txt");
+    stringstream d_tmp;
+    d_tmp  << "./outputs/dat" << setfill('0') << setw(2) << to_string(step) << ".txt";
+    ofstream dat(d_tmp.str());
+    stringstream e_tmp;
+    e_tmp  << "./outputs/err" << setfill('0') << setw(2) << to_string(step) << ".txt";
+    ofstream eps(e_tmp.str());
     cout << "ROUND: "<<step << endl;
     iterate();
     update();
@@ -131,8 +138,10 @@ void Smc::iterate()  {
       acc = test(i,cno);
     }
     priors(i) = models[cno].params.pri;
+    cout << models[cno].Itot << endl;
     lstream.str(string());
   }
+  cout << "Tolerance: " << tolerance.transpose() << endl;
 }
 
 
