@@ -45,32 +45,33 @@ void Model::setup(gsl_rng* rr)  {
   RDC = 0;
   RCP = 0;
   t = 1;  // This is 1st Feb
-  states.resize(N,0);
-  dstate.resize(N,0);
-  time_i.resize(N,-1);
-  time_r.resize(N,-1);
-  time_c.resize(N,-1);
-  i_by.resize(N,-1);
+  states.resize(N,0);     //
+  dstate.resize(N,0);     //
+  vaccd.resize(N,0);      // Vaccianted or not.
+  dvacc.resize(N,0);      // Being vaccinated today
+  time_i.resize(N,-1);    // Time infected
+  time_r.resize(N,-1);    // Time reported
+  time_c.resize(N,-1);    // Time culled
+  i_by.resize(N,-1);      // Who infected by
   sus.resize(N,0.0);
   tblty.resize(N,vector<double>(0,0.0));
   // Init the grids - requires farm locations
   grid.setup(farms);
   igrids.resize(grid.ngrids,0);// Total infection counts in each grid over all runs
   // Track number of cases & culls for farms and animals
-  ninfd.resize(farms.enreg,0);  // Cases
-  nculd.resize(farms.enreg,0);  // Culls
-  infd = vector< vector<int> >(farms.enreg,vector<int>(3,0)); // Cases in 5 #s, 3 species
-  culd = vector< vector<int> >(farms.enreg,vector<int>(3,0)); // Culls in 5 regions, 3 species
+  einfd.resize(params.nspc,farms.enreg);    // Farms,animals infected in each region
+  eculd.resize(params.nspc,farms.enreg);
+  evacd.resize(params.nspc,farms.enreg);
   ertot.resize(farms.enreg, vector<double> (6,0.0));
 
   // TODO move out of constructor - belongs with farm data?
-  norm_fi.resize(farms.enreg,0.0); // Normalising constants for each region
-  norm_fc.resize(farms.enreg,0.0); // TODO could store species together
-  norm_ci.resize(farms.enreg,0.0);
-  norm_si.resize(farms.enreg,0.0);
-  norm_cc.resize(farms.enreg,0.0);
-  norm_sc.resize(farms.enreg,0.0);
-  if (G_CONST::err_d_c)  { // These are daily values, want to normalise to cumulative end
+  norm_fi.resize(farms.enreg,1.0); // Normalising constants for each region
+  norm_fc.resize(farms.enreg,1.0); // TODO could store species together
+  norm_ci.resize(farms.enreg,1.0);
+  norm_si.resize(farms.enreg,1.0);
+  norm_cc.resize(farms.enreg,1.0);
+  norm_sc.resize(farms.enreg,1.0);
+  if (G_CONST::err_day)  { // These are daily values, want to normalise to cumulative end
    for (int reg=0;reg<farms.enreg;++reg)  {
       norm_fi[reg] = 1.0/max((double)( accumulate(farms.farmsi[reg].begin(),farms.farmsi[reg].begin()+tmax,0) ),1.0);
       norm_fc[reg] = 1.0/max((double)( accumulate(farms.farmsc[reg].begin(),farms.farmsc[reg].begin()+tmax,0) ),1.0);
@@ -90,7 +91,6 @@ void Model::setup(gsl_rng* rr)  {
       norm_sc[reg] = 1.0/max((double)(farms.sheepc[reg][tmax]),1.0);
     }
   }
-
 }
 
 
@@ -126,7 +126,6 @@ void Model::initrun()  {
  * \return void - values all stored in member vector
  */
 void Model::sus_calc()  {
-  // FIXME HACKED parameter vs farm region. should be 0 anyway, only eregion[i] is a thing
   if (plaw)  {
     for (int i=0;i<N;++i)  {
       int reg = farms.region[i];
@@ -430,6 +429,7 @@ void Model::update()  {
     }
   }
   fill(dstate.begin(),dstate.end(),0);
+  fill(dvacc.begin(),dstate.end(),0);
   fill(C_d.begin(),C_d.end(),0);
   fill(R_d.begin(),R_d.end(),0); // This is a daily counter...
 }
@@ -785,14 +785,15 @@ void Model::resetsim()  {
   RCP = 0;
   fill(states.begin(),states.end(),0);
   fill(dstate.begin(),dstate.end(),0);
+  fill(vaccd.begin(),dstate.end(),0);
+  fill(dvacc.begin(),dstate.end(),0);
   fill(time_i.begin(),time_i.end(),-1);
   fill(time_r.begin(),time_r.end(),-1);
   fill(time_c.begin(),time_c.end(),-1);
   fill(i_by.begin(),i_by.end(),-1);
-  fill(ninfd.begin(),ninfd.end(),0);
-  fill(nculd.begin(),nculd.end(),0);
-  infd = vector< vector<int> >(5,vector<int>(3,0));
-  culd = vector< vector<int> >(5,vector<int>(3,0));
+  eculd.fill(0);
+  einfd.fill(0);
+  evacd.fill(0);
   // TODO careful of memory overheads here! - see massif profile. trade against time...
   /*for (int itmp=0;itmp<tblty.size();++itmp)  {
     fill(tblty[itmp].begin(),tblty[itmp].end(),0.0);
@@ -817,14 +818,10 @@ void Model::resetsim()  {
  * \return void
  */
 void Model::error_calc()  {
-  // TODO Eigen-ise this shit.
-  if (G_CONST::err_d_c)  {  // if daily
-    fill(ninfd.begin(),ninfd.end(),0);
-    fill(nculd.begin(),nculd.end(),0);
-    for (int reg=0;reg<farms.enreg;++reg)  {
-      fill(infd[reg].begin(),infd[reg].end(),0);
-      fill(culd[reg].begin(),culd[reg].end(),0);
-    }
+  if (G_CONST::err_day)  {  // if daily
+    einfd.fill(0);
+    eculd.fill(0);
+    evacd.fill(0);
   }
   for (int i=0;i<N;++i)  {
     switch (dstate[i])  {
@@ -832,9 +829,10 @@ void Model::error_calc()  {
       break;
 
       case 1:   // Infection
-        ++ninfd[farms.eregion[i]];                    // Infected Farm
-        infd[farms.eregion[i]][0] += farms.N[i][0];   // Infected cattle
-        infd[farms.eregion[i]][1] += farms.N[i][1];   // Infected sheep
+        einfd(0,farms.eregion[i]) = einfd(0,farms.eregion[i]) + 1;
+        for (int spc=0;spc<params.nspc+1;++spc)  {
+          einfd(spc+1,farms.eregion[i]) = einfd(spc+1,farms.eregion[i]) + farms.N[i][spc];
+        }
       break;
 
       case 2:   // IP reported
@@ -851,50 +849,70 @@ void Model::error_calc()  {
       break;
 
       case 6:   // Culling DC/CP - are required here for total number of culls
-        ++nculd[farms.eregion[i]];
-        culd[farms.eregion[i]][0] += farms.N[i][0];
-        culd[farms.eregion[i]][1] += farms.N[i][1];
+        eculd(0,farms.eregion[i]) = eculd(0,farms.eregion[i]) + 1;
+        for (int spc=0;spc<params.nspc;++spc)  {
+          eculd(spc+1,farms.eregion[i]) = eculd(spc+1,farms.eregion[i]) + farms.N[i][spc];
+        }
       break;
     }
   }
-  //cout << t << "\t";
+  if (G_CONST::err_vac)  {
+    for (int i=0;i<N;++i)  {
+      if (dvacc[i])  {
+        evacd(0,farms.eregion[i]) = evacd(0,farms.eregion[i]) + 1;
+        for (int spc=0;spc<params.nspc;++spc)  {
+          evacd(spc+1,farms.eregion[i]) = evacd(spc+1,farms.eregion[i]) + farms.N[i][spc];
+        }
+      }
+    }
+  }
+  // TODO Eigen::ise this shit. More specifically where Farms::loaderrdat works and stores...
   for (int reg=0;reg<farms.enreg;++reg)  {
-    // Today's differences in daily/cumulative numbers of reported cases and culled premises
+    // Today's differences in daily/cumulative numbers of reported cases
     // On regional basis and normalised by metric value on day tmax
-    double dninfd = (ninfd[reg]  -farms.farmsi[reg][t])*norm_fi[reg];
-    double dinfdc = (infd[reg][0]-farms.cowssi[reg][t])*norm_ci[reg];
-    double dinfds = (infd[reg][1]-farms.sheepi[reg][t])*norm_si[reg];
-    double dnculd = (nculd[reg]  -farms.farmsc[reg][t])*norm_fc[reg];
-    double dculdc = (culd[reg][0]-farms.cowssc[reg][t])*norm_cc[reg];
-    double dculds = (culd[reg][1]-farms.sheepc[reg][t])*norm_sc[reg];
-    //cout << ninfd[reg]-farms.farmsi[reg][t] << " ";// << ninfd[reg] << " ";
-    ertot[reg][0] = ertot[reg][0] + dninfd*dninfd;
-    ertot[reg][1] = ertot[reg][1] + dinfdc*dinfdc;
-    ertot[reg][2] = ertot[reg][2] + dinfds*dinfds;
-    ertot[reg][3] = ertot[reg][3] + dnculd*dnculd;
-    ertot[reg][4] = ertot[reg][4] + dculdc*dculdc;
-    ertot[reg][5] = ertot[reg][5] + dculds*dculds;
-   //ertot[reg]    = ertot[reg] +(dnculd*dnculd) + dculdc*dculdc + dculds*dculds);
+    double dninf = (einfd(reg,0)-farms.farmsi[reg][t])*norm_fi[reg];
+    double dinf0 = (einfd(reg,1)-farms.cowssi[reg][t])*norm_ci[reg];
+    double dinf1 = (einfd(reg,2)-farms.sheepi[reg][t])*norm_si[reg];
+    ertot[reg][0] = ertot[reg][0] + dninf+dninf;
+    ertot[reg][1] = ertot[reg][1] + dinf0*dinf0;
+    ertot[reg][2] = ertot[reg][2] + dinf1*dinf1;
+    if (G_CONST::err_dcp)  {
+      // Today's differences in daily/cumulative numbers of culled premises
+      double dnculf = (eculd(reg,0)-farms.farmsc[reg][t])*norm_fc[reg];
+      double dculd0 = (eculd(reg,1)-farms.cowssc[reg][t])*norm_cc[reg];
+      double dculd1 = (eculd(reg,2)-farms.sheepc[reg][t])*norm_sc[reg];
+      ertot[reg][3] = ertot[reg][3] + dnculf*dnculf;
+      ertot[reg][4] = ertot[reg][4] + dculd0*dculd0;
+      ertot[reg][5] = ertot[reg][5] + dculd1*dculd1;
+    }
+    if (G_CONST::err_vac)  {
+      // Today's differences in daily/cumulative numbers of vaccinated premises
+      double dnvacf = (evacd(reg,0)-farms.farmsc[reg][t])*norm_fc[reg];
+      double dnvac0 = (evacd(reg,1)-farms.cowssc[reg][t])*norm_cc[reg];
+      double dnvac1 = (evacd(reg,2)-farms.sheepc[reg][t])*norm_sc[reg];
+      ertot[reg][3] = ertot[reg][3] + dnvacf*dnvacf;
+      ertot[reg][4] = ertot[reg][4] + dnvac0*dnvac0;
+      ertot[reg][5] = ertot[reg][5] + dnvac1*dnvac1;
+    }
   }
 }
 
 
-// WIP vacc around target farm i
-/** \brief WIP - not fully designed or implemented...?
- * Checks for farms inside predefined annulus range,
+/** \brief Checks for farms inside predefined annulus radii vaccrange[0] to vaccrange[1]
+ * WIP - not fully designed or implemented...?
  * \param i int farm id
  * \return void
  */
 void Model::vaccinate(int i)  {
   int g = grid.g_id[i];
   auto hh_it = grid.potgrids[g].begin();
-  // Check farms in nearby grids
+  // Check farms in nearby grids only
   while (hh_it!=grid.potgrids[g].end())  {
     int h = *hh_it;
     for (auto j_it=grid.f_id[h].begin();j_it!=grid.f_id[h].end();++j_it)  {
       double d2 = dist2(i,*j_it);
       if ((d2>params.vaccrange[0])&&(d2<params.vaccrange[1]))  { // annulus
-        dstate[*j_it] = 99; // to be vaccinated...
+        dvacc[*j_it] = 1; // to be vaccinated...
       }
     }
   }

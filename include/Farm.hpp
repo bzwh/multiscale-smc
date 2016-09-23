@@ -30,6 +30,7 @@ class Farms  {
     std::vector<int> seedtimec;             //!< Corresponding times of culls
 
     // REAL numbers of infected and culled farms by region, each day. farmsi[day][reg]
+    // FIXME hardcoded "cow" and "sheep". Poor piggies =[
     std::vector< std::vector<int> > farmsi;
     std::vector< std::vector<int> > farmsc;
     std::vector< std::vector<int> > cowssi;

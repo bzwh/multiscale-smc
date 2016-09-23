@@ -65,7 +65,7 @@ Smc::Smc(int nc,int nn,int ss,Farms& frms)  {
   means.resize(npar);
   sigma = MatrixXd::Zero(npar,npar);
   tolerance.resize(nmet);
-  tolerance.fill(10.0);
+  tolerance.fill(2.2);
   //tolerance << 0.105,0.165,0.180,0.140,0.08;
   epsilons = MatrixXd::Zero(N,nmet);
   step = 0;
@@ -96,7 +96,7 @@ void Smc::run()  {
     cout << "ROUND: "<<step << endl;
     iterate();
     update();
-    cout << "\n" << endl;
+    cout << "\n Tolerance: " << tolerance.transpose() << "\n" << endl;
     write(dat,eps,wht,sig);
     dat.close();
     eps.close();
@@ -138,10 +138,8 @@ void Smc::iterate()  {
       acc = test(i,cno);
     }
     priors(i) = models[cno].params.pri;
-    cout << models[cno].Itot << endl;
     lstream.str(string());
   }
-  cout << "Tolerance: " << tolerance.transpose() << endl;
 }
 
 
@@ -165,13 +163,8 @@ void Smc::gen(int i,int cno)  {
       int j = find(samp.begin(),samp.end(),1)-samp.begin();
       particles_new.row(i) = particles_old.row(j) + perturbation(cno).transpose();
     }
-    /*stringstream lstream;
-    lstream << particles_new.row(i) << "\n";
-    cout << lstream.str() << flush;
-    lstream.str(string());*/
     models[cno].parse(particles_new.row(i));
     pcheck = models[cno].params.prior_check();  // 0 for all good
-    //cout << pcheck << flush;
   }
 }
 

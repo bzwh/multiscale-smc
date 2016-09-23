@@ -26,7 +26,7 @@ Params::Params()  {
     pread(pdat);
     pdat.close();
   }
-  else{
+  else  {
     // Determines model and parameters to fit
     nreg = G_CONST::fit_reg;         // number of regions to split parameterisation in to
     plaw = G_CONST::fit_plw;         // using power law scaling or not?
@@ -35,11 +35,12 @@ Params::Params()  {
     pdet = G_CONST::fit_det ? 2 : 0; // Fitting ~gamma(u,k)
     pdcs = G_CONST::fit_dcs;         // 2-dist, 1-const, 0-nope
     pdcf = G_CONST::fit_dcf;         // Fitting DC f accuracy
-    pwfm = G_CONST::fit_msc ?12 : 0;// Fitting within-farm model parameters
+    pwfm = G_CONST::fit_msc ?12 : 0; // Fitting within-farm model parameters
     rwfm = G_CONST::multisc;         // 1: Within farm SEmInR model  0: Step function
+    pvac = G_CONST::fit_vac ? 2 : 0; // Scaling for sus and trans for vaccinated farms
 
     pper = (plaw) ? 7 : 3;   // number of regionalised parameters (sus and trans, no powerlaws)
-    pnum = nreg*pper+pker+pdet+pdcs+pdcf+pwfm;
+    pnum = nreg*pper+pker+pdet+pdcs+pdcf+pwfm+pvac;
     storage_setup(); // storage
 
     // Initialising priors here??? - put in list??
@@ -98,8 +99,11 @@ Params::Params()  {
     ker[1] = 3.0; // Boender kernel, Marleen's estimates
 
     // Vaccination strategy - wip
-    vaccrange.resize(2,0.0);
-    vaccrange[1] = 5.0;
+    if (pvac)  {
+      vcc_max[0] = 25.0;
+      vcc_max[1] = 25.0;
+    }
+    vaccrange[1] = 10.0;
   }
   pri = 0.0;
 }
@@ -135,6 +139,10 @@ void Params::storage_setup()  {
   ker_min.resize(pker,0.0);
   ker_max.resize(pker,0.0); // cheap, no real need to check if these are actually going to be used
   // Vaccination WIP
+  if (pvac)  {
+    vcc_min.resize(2,1.0);
+    vcc_max.resize(2,1.0);
+  }
   vaccrange.resize(2,0.0);
   // Priors: Sus/Trans
   sus_min.resize(nreg,vector<double>(nspc,0.0));
@@ -174,10 +182,10 @@ void Params::storage_setup()  {
 void Params::load_transmission()  {
   ifstream cowdat;
   #ifdef _WIN32_WINNT
-    cowdat.open("D:/Ben/data/uk/wfm-cows.txt");
+    cowdat.open("D:/Ben/data/wfm/wfm-cows.txt");
   #endif // _WIN32_WINNT
   #ifdef __linux__
-    cowdat.open("../../data/uk/wfm-cows.txt");
+    cowdat.open("../../data/wfm/wfm-cows.txt");
   #endif // __linux__
   if(cowdat.is_open())  { // these should be shape and scale of gam fit'd model pars
     cowdat >> latk[0][0] >> latk[0][1]
@@ -193,10 +201,10 @@ void Params::load_transmission()  {
   }
   ifstream shpdat;
   #ifdef _WIN32_WINNT
-    shpdat.open("D:/Ben/data/uk/wfm-lamb.txt");
+    shpdat.open("D:/Ben/data/wfm/wfm-pigs.txt");
   #endif // _WIN32_WINNT
   #ifdef __linux__
-    shpdat.open("../../data/uk/wfm-lamb.txt");
+    shpdat.open("../../data/wfm/wfm-pigs.txt");
   #endif // __linux__
   if(shpdat.is_open())  { // these should be shape and scale for sheep
     shpdat >> latk[1][0] >> latk[1][1]

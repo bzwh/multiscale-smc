@@ -29,7 +29,7 @@ Farms::Farms()  {
   cldat = datapath + "CULL_Farms_BH";
   if (G_CONST::err_reg==1)  {
     fmdat = datapath + "Farm_Data_BH_onereg";
-    if (G_CONST::err_d_c)  {
+    if (G_CONST::err_day)  {
       erdat = datapath + "errors_daily_onereg.txt";
     }
     else  {
@@ -38,7 +38,7 @@ Farms::Farms()  {
   }
   else  { // Cumbria, Devon, Wales, Scotland, RoUK
     fmdat = datapath + "Farm_Data_BH";
-    if (G_CONST::err_d_c)  {
+    if (G_CONST::err_day)  {
       erdat = datapath + "errors_daily.txt";
     }
     else  {
@@ -182,7 +182,6 @@ void Farms::loadcps()  {
  *  \return void
  */
 void Farms::loadseeds()  {
-  int tmax = G_CONST::seedday;
   ifstream ipdat;
   ifstream dcdat;
   ipdat.open(whdat.data()); // confirmed infected
@@ -195,7 +194,7 @@ void Farms::loadseeds()  {
   if (ipdat.is_open())  {
     while (1)  {
       ipdat >> seedf >> seedt;
-      if (seedt>tmax)  {
+      if (seedt>G_CONST::seedday)  {
         break;
       }
       //cout << seedf << "\t" << seedt << endl;
@@ -216,7 +215,7 @@ void Farms::loadseeds()  {
   if (dcdat.is_open())  {
     while (1)  {
       dcdat >> seedf >> seedt;
-      if (seedt>tmax)  {
+      if (seedt>G_CONST::seedday)  {
         break;
       }
       //cout << seedf << "\t" << seedt << endl;

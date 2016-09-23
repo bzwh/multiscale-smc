@@ -5,7 +5,9 @@ namespace G_CONST  {
   extern const int rej_amh;     //!< TODO Rejection sampler or adaptive metropolis
 
   extern const int err_reg;     //!< Daily or cumulative
-  extern const int err_d_c;     //!< Regionalised fit metric - for Farms and Epi
+  extern const int err_day;     //!< Regionalised fit metric - for Farms and Epi
+  extern const int err_dcp;     //!< Metric on pre-emptive culls as well as IPs
+  extern const int err_vac;     //!< Metric on vaccinated farms
 
   extern const int fit_reg;     //!< Regionalised parameters
   extern const int fit_plw;     //!< Power law or linear scaling on animal numbers
@@ -15,10 +17,12 @@ namespace G_CONST  {
   extern const int fit_dcs;     //!< Fitting culls F parameters (distribution?)
   extern const int fit_dcf;     //!< Fitting cull f parameter - tracing accuracy
   extern const int fit_msc;     //!< Fitting the WFM parameters
+  extern const int fit_vac;     //!< Fitting vaccination parameters
 
   extern const int multisc;     //!< Using multi-scale model or step-function
   extern const int cp_cull;     //!< Contiguous premises culled? (UK vs JPN)
   extern const int dc_cull;     //!< Simulate dangerous contact culls?
+  extern const int rn_vacc;     //!< Simulate ring vaccination
 
   extern const int simtmax;     //!< How many days to run the simulation
   extern const int withtmx;     //!< Max length of within-farm epidemic run

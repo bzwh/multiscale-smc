@@ -32,24 +32,27 @@ public:
   double pri;
   // DATA
   int pnum; //!< Total number of parameters being fitted
-  int nreg; //!< # regional parameter sets (just fitting 1 set!)
-  int nspc; //!< # species (sort of hacked at 3)
+  int nreg; //!< Num regional parameter sets (just fitting 1 set!)
+  int nspc; //!< Num species [usually 2 - cattle + sheep(UK)/pigs(JP)]
   int plaw; //!< toggle power law or linear scaling
-  int pker; //!< # kernel parameters
-  int pper; //!< # parameters per region
-  int pdet; //!< # parameters for delay to detection (gamma distributed)
-  int pdcs; //!< # parameters for DC cull - F (distributed?)
+  int pker; //!< Num kernel parameters
+  int pper; //!< Num parameters per region
+  int pdet; //!< Num parameters for delay to detection (gamma distributed)
+  int pdcs; //!< Num parameters for DC cull - F (distributed?)
   int pdcf; //!< toggle for DC cull - f (const?)
   int pwfm; //!< toggle for fitting wfm gamma shape/mean latent+infectious periods, beta
+  int pvac; //!< Num parameters for vaccination (sus and trans scaling)
+  int rwfm; //!< Running within-farm model?
   // BETWEEN FARM PARAMETERS
   // Susceptibility & transmissibility parameters for each region
   // 0:Cubria, 1:Devon, 2:Wales, 3:Scotland, 4:Rest of England
-  int rwfm;                                 //!< Running within-farm model?
   std::vector< std::vector<double> > sb;    //!< Susceptibility coefficient
   std::vector< std::vector<double> > tb;    //!< Transmissibility coefficient
   // Powerlaws
   std::vector< std::vector<double> > sp;    //!< Susceptibility exponent
   std::vector< std::vector<double> > tp;    //!< Transmissibility exponent
+  // Vaccd pars
+  std::vector<double> vc;                   //!< Scaling for sus and trans for vac'd farms
   // Kernel
   std::vector<double> ker;                  //!< Kernel parameters k0,d0,alpha
 
@@ -91,17 +94,16 @@ public:
   Eigen::VectorXd par_vec;                    //!< Next proposed set - parsed in to above details
 
 
-  // Should these be in Chain?
-  // These used to generate starting point as well as priors for rejection?
+
+
+
+private:
   // Regional species-specific susceptibility range (flat prior)
   std::vector< std::vector<double> > sus_min; //!< Flat prior lower bound
   std::vector< std::vector<double> > sus_max; //!< Flat prior upper bound
   // Regional species-specific transmissibility range (flat prior)
   std::vector< std::vector<double> > trn_min; //!< Flat prior lower bound
   std::vector< std::vector<double> > trn_max; //!< Flat prior upper bound
-
-
-private:
   // Regional species-specific powerlaws
   double sp_min;  //!< Flat prior exponent bounds
   double sp_max;  //!< Flat prior exponent bounds
@@ -115,6 +117,8 @@ private:
   std::vector<double> dcFmax;
   std::vector<double> ker_min;
   std::vector<double> ker_max;
+  std::vector<double> vcc_min;
+  std::vector<double> vcc_max;
 };
 
 #endif

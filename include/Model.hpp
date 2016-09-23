@@ -73,6 +73,8 @@ public:
   //std::ofstream rdat;       //!< Where to dump the output of individual runs
   std::vector<int> states;  //!< 0:Sus 1:Inf  2:Rep  3:Notified -1:R-IP -2:R-DC/CP
   std::vector<int> dstate;  //!< Today's state transitions
+  std::vector<int> vaccd;   //!< Vaccination status...
+  std::vector<int> dvacc;   //!< Today's vaccinations...?
   std::vector<int> time_i;  //!< When was i infected
   std::vector<int> time_r;  //!< When was i reported
   std::vector<int> time_c;  //!< When was i culled
@@ -95,10 +97,9 @@ public:
   std::vector<int> igrids;  //!< Tracking numbers of infections in each grid(?)
 
   // Tracking epidemic progress to calc fit metric. Store daily stuff for entire run?
-  std::vector<int> ninfd;               //!< Regional number of infected farms
-  std::vector<int> nculd;               //!< regional number of culled farms
-  std::vector< std::vector<int> > infd; //!< Regional numbers of infected cows/pigs/sheep
-  std::vector< std::vector<int> > culd; //!< Regional numbers of culled cows/pigs/sheep
+  Eigen::MatrixXi einfd;
+  Eigen::MatrixXi eculd;
+  Eigen::MatrixXi evacd;
   std::vector< std::vector<double> > ertot;            //!< Regional errors, as def by fit metric
 
   // Normalising constants for fit metric

@@ -11,9 +11,9 @@ using namespace std;
 
 
 int main ( int argc, char* argv[])  {
-  const int nthrds = 4;
-  const int nparts = 100;
-  const int nround = 1;
+  const int nthrds = 48;
+  const int nparts = 5000;
+  const int nround = 20;
 
 
   Farms frms;     // Initialise and  load outside of parallel region.
