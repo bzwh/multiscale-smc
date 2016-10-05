@@ -59,9 +59,9 @@ void Model::setup(gsl_rng* rr)  {
   grid.setup(farms);
   igrids.resize(grid.ngrids,0);// Total infection counts in each grid over all runs
   // Track number of cases & culls for farms and animals
-  einfd.resize(params.nspc,farms.enreg);    // Farms,animals infected in each region
-  eculd.resize(params.nspc,farms.enreg);
-  evacd.resize(params.nspc,farms.enreg);
+  einfd.resize(1+params.nspc,farms.enreg);    // Farms,animals infected in each region
+  eculd.resize(1+params.nspc,farms.enreg);
+  evacd.resize(1+params.nspc,farms.enreg);
   ertot.resize(farms.enreg, vector<double> (6,0.0));
 
   // TODO move out of constructor - belongs with farm data?
@@ -429,7 +429,7 @@ void Model::update()  {
     }
   }
   fill(dstate.begin(),dstate.end(),0);
-  fill(dvacc.begin(),dstate.end(),0);
+  fill(dvacc.begin(),dvacc.end(),0);
   fill(C_d.begin(),C_d.end(),0);
   fill(R_d.begin(),R_d.end(),0); // This is a daily counter...
 }
@@ -785,8 +785,8 @@ void Model::resetsim()  {
   RCP = 0;
   fill(states.begin(),states.end(),0);
   fill(dstate.begin(),dstate.end(),0);
-  fill(vaccd.begin(),dstate.end(),0);
-  fill(dvacc.begin(),dstate.end(),0);
+  fill(vaccd.begin(),vaccd.end(),0);
+  fill(dvacc.begin(),dvacc.end(),0);
   fill(time_i.begin(),time_i.end(),-1);
   fill(time_r.begin(),time_r.end(),-1);
   fill(time_c.begin(),time_c.end(),-1);
@@ -830,7 +830,7 @@ void Model::error_calc()  {
 
       case 1:   // Infection
         einfd(0,farms.eregion[i]) = einfd(0,farms.eregion[i]) + 1;
-        for (int spc=0;spc<params.nspc+1;++spc)  {
+        for (int spc=0;spc<params.nspc;++spc)  {
           einfd(spc+1,farms.eregion[i]) = einfd(spc+1,farms.eregion[i]) + farms.N[i][spc];
         }
       break;
@@ -870,26 +870,26 @@ void Model::error_calc()  {
   for (int reg=0;reg<farms.enreg;++reg)  {
     // Today's differences in daily/cumulative numbers of reported cases
     // On regional basis and normalised by metric value on day tmax
-    double dninf = (einfd(reg,0)-farms.farmsi[reg][t])*norm_fi[reg];
-    double dinf0 = (einfd(reg,1)-farms.cowssi[reg][t])*norm_ci[reg];
-    double dinf1 = (einfd(reg,2)-farms.sheepi[reg][t])*norm_si[reg];
-    ertot[reg][0] = ertot[reg][0] + dninf+dninf;
+    double dninf = (einfd(0,reg)-farms.farmsi[reg][t])*norm_fi[reg];
+    double dinf0 = (einfd(1,reg)-farms.cowssi[reg][t])*norm_ci[reg];
+    double dinf1 = (einfd(2,reg)-farms.sheepi[reg][t])*norm_si[reg];
+    ertot[reg][0] = ertot[reg][0] + dninf*dninf;
     ertot[reg][1] = ertot[reg][1] + dinf0*dinf0;
     ertot[reg][2] = ertot[reg][2] + dinf1*dinf1;
     if (G_CONST::err_dcp)  {
       // Today's differences in daily/cumulative numbers of culled premises
-      double dnculf = (eculd(reg,0)-farms.farmsc[reg][t])*norm_fc[reg];
-      double dculd0 = (eculd(reg,1)-farms.cowssc[reg][t])*norm_cc[reg];
-      double dculd1 = (eculd(reg,2)-farms.sheepc[reg][t])*norm_sc[reg];
+      double dnculf = (eculd(0,reg)-farms.farmsc[reg][t])*norm_fc[reg];
+      double dculd0 = (eculd(1,reg)-farms.cowssc[reg][t])*norm_cc[reg];
+      double dculd1 = (eculd(2,reg)-farms.sheepc[reg][t])*norm_sc[reg];
       ertot[reg][3] = ertot[reg][3] + dnculf*dnculf;
       ertot[reg][4] = ertot[reg][4] + dculd0*dculd0;
       ertot[reg][5] = ertot[reg][5] + dculd1*dculd1;
     }
     if (G_CONST::err_vac)  {
       // Today's differences in daily/cumulative numbers of vaccinated premises
-      double dnvacf = (evacd(reg,0)-farms.farmsc[reg][t])*norm_fc[reg];
-      double dnvac0 = (evacd(reg,1)-farms.cowssc[reg][t])*norm_cc[reg];
-      double dnvac1 = (evacd(reg,2)-farms.sheepc[reg][t])*norm_sc[reg];
+      double dnvacf = (evacd(0,reg)-farms.farmsc[reg][t])*norm_fc[reg];
+      double dnvac0 = (evacd(1,reg)-farms.cowssc[reg][t])*norm_cc[reg];
+      double dnvac1 = (evacd(2,reg)-farms.sheepc[reg][t])*norm_sc[reg];
       ertot[reg][3] = ertot[reg][3] + dnvacf*dnvacf;
       ertot[reg][4] = ertot[reg][4] + dnvac0*dnvac0;
       ertot[reg][5] = ertot[reg][5] + dnvac1*dnvac1;
