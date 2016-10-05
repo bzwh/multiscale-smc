@@ -10,7 +10,8 @@
 
 class Smc{
 public:
-  Smc(int,int,int,Farms&);
+  Smc(int,int,int,int,Farms&);
+  void restart();
   void run();
   void gen(int,int);
   Eigen::VectorXd perturbation(int);
@@ -37,13 +38,15 @@ public:
   double ess;                                 /// Effective Sample Size, duh.
   int step;                                   /// How many filtering steps done
   int N;                                      /// Number of particles to accept at each step
+  int n_done;                                 /// Number of particles done this round (restart!)
   int npar;                                   /// Number of parameters.
   int nround;
   int nmet;
   int nthreads;
+  int pflag;
 
 private:
-
+  std::ofstream p_dat;
 };
 
 #endif // SMC_HPP_INCLUDED
