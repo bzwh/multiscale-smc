@@ -74,6 +74,7 @@ Smc::Smc(int nc,int nn,int ss,int pf,Farms& frms)  {
   //tolerance << 0.105,0.165,0.180,0.140,0.08;
   epsilons = MatrixXd::Zero(N,nmet);
   step = 0;
+  ess = 0.0;
   n_done = 0;
   if (pflag)  {
     restart();
@@ -85,11 +86,44 @@ void Smc::restart()  {
   if (LFLAG)  {
     cout << "...reloading:" << endl;
   }
+  // To read in particles_old from datXY.txt and N particles----------------------------------------
+  stringstream pname;
+  string line;
+  int numlines = 0;
+  ifstream pdat;
+  pname << "./outputs/dat" << setfill('0') << setw(2) << to_string(step-1) << ".txt";
+  pdat.open(pname.str());
+  if (pdat.is_open())  {
+    while (getline(pdat,line))  {
+      ++numlines;
+    }
+    pdat.clear();
+    pdat.seekg(0,pdat.beg);
+    for (int iline=0;iline<N;++iline)  {
+      Eigen::VectorXd ptmp = Eigen::VectorXd::Zero(npar);
+      for (int ipar=0;ipar<npar;++ipar)  {
+        pdat >> ptmp(ipar);
+      }
+      particles_old.row(iline) = ptmp;
+      if (pdat.eof())  {
+        cout << "trying to read too much from " << pname.str() << endl;
+        exit(-1);
+      }
+    }
+  }
+  else  {
+    cout << "can't open old " << pname.str() << " file" << endl;
+    exit(-1);
+  }
+  N = numlines;     // This better be right!
+  // Happily read everything expected, but what if not at end of file? ie more particles/parameters?
+  // Check model spec'd? Can't really guess Settings.cpp and Country from outputs?
+
+  // Reading particles done so far------------------------------------------------------------------
   VectorXd tmp_par = VectorXd::Zero(npar);
   VectorXd tmp_err = VectorXd::Zero(nmet);
   ifstream dfile("./outputs/dtmp.txt");
   if (dfile.is_open())  {
-    dfile >> step;
     while(true)  {
       for (int ipar=0;ipar<npar;++ipar)  {    // Grab complete particle
         dfile >> tmp_par(ipar);
@@ -112,10 +146,6 @@ void Smc::restart()  {
     exit(-1);
   }
   dfile.close();
-  if (LFLAG)  {
-    cout << " Reading round:\t" << step << endl;
-    cout << " Found particles:\t" << n_done << endl;
-  }
   #pragma omp parallel for num_threads(nthreads) schedule(dynamic)
   for (int ii=0;ii<n_done;++ii)  {
     int cno = omp_get_thread_num();
@@ -124,13 +154,20 @@ void Smc::restart()  {
     priors(ii) = models[cno].params.pri;
   }
 
-  // To read in particle weights
+  // To read in particle WEIGHTS and STEP-----------------------------------------------------------
   ifstream wfile("./outputs/wht.txt");
   VectorXd tmp_wht = VectorXd::Zero(N);
   if (wfile.is_open())  {
+    string line;
+    int numrnds = 0;
+    while (getline(wfile,line))  {
+      ++numrnds;
+    }
+    wfile.clear();
+    wfile.seekg(0,wfile.beg);
     int to_skip = (N+1)*(step-1)-1;   // Have ESS + N weights per line. now on step+1'th round (line)
     double read_in = 0.0;
-    int iwht = 0;         // discard. seekg would be better...
+    int iwht = 0;         // discard. seekg would be better...?
     while (wfile>>read_in)  {
       if (iwht==to_skip)  {
         break;
@@ -147,7 +184,8 @@ void Smc::restart()  {
       tmp_wht(iwht++) = read_in;
     }
     if (iwht!=N)  {
-      cout << "Not go the right number of weights..." << iwht << endl;
+      cout << "Not go the right number of weights..." << iwht << ". ESS: " <<  ess << endl;
+      cout << "Weights read in so far... " << tmp_wht.transpose() << endl;
       exit(-1);
     }
   }
@@ -161,8 +199,9 @@ void Smc::restart()  {
     cout << " ESS:\t" << ess << endl;
     cout << " WHT:\t" << weights_old.head(1) << "\t" << weights_old.tail(1) << endl << endl;
   }
+  step = numrnds;
 
-  // To read in means sigma and sginv
+  // To read in means sigma and sginv---------------------------------------------------------------
   ifstream sfile("./outputs/sig.txt");
   VectorXd tmp_in = Eigen::VectorXd::Zero(3*npar);
   if (sfile.is_open())  {
@@ -205,51 +244,13 @@ void Smc::restart()  {
          << " si:\t" << sginv.transpose() << endl;
   }
 
-  // To read in particles_old from datXY.txt
-  stringstream pname;
-  string line;
-  int numlines = 0;
-  ifstream pdat;
-  pname << "./outputs/dat" << setfill('0') << setw(2) << to_string(step-1) << ".txt";
-  pdat.open(pname.str());
-  if (pdat.is_open())  {
-    while (getline(pdat,line))  {
-      ++numlines;
-    }
-    cout << " N: " << N << "\t numlines: " << numlines << endl;
-    pdat.seekg(0,pdat.beg);
-    for (int iline=0;iline<N;++iline)  {
-      Eigen::VectorXd ptmp = Eigen::VectorXd::Zero(npar);
-      for (int ipar=0;ipar<npar;++ipar)  {
-        pdat >> ptmp(ipar);
-      }
-      particles_old.row(iline) = ptmp;
-      if (pdat.eof())  {
-        cout << "trying to read too much from " << pname.str() << endl;
-        exit(-1);
-      }
-    }
-  }
-  else  {
-    cout << "can't open old " << pname.str() << " file" << endl;
-    exit(-1);
-  }
-  // Happily read everything expected, but what if not at end of file? ie more particles/parameters?
-  // Check model spec'd? Can't really guess Settings.cpp and Country from outputs?
-
   // To read in tolerance to use from errXY.txt
   stringstream ename;
   ifstream edat;
-  int numrnds = 0;
   ename << "./outputs/err" << setfill('0') << setw(2) << to_string(step-1) << ".txt";
   Eigen::VectorXd etmp = Eigen::VectorXd::Zero(nmet);
   edat.open(ename.str());
   if (edat.is_open())  {
-    while (getline(pdat,line))  {
-      ++numrnds;
-    }
-    cout << " step: " << step << "\t numrnds: " << numrnds << endl;
-    edat.seekg(0,edat.beg());
     for (int imet=0;imet<nmet;++imet)  {
       edat >> etmp(imet);
     }
@@ -267,7 +268,8 @@ void Smc::restart()  {
     cout << " Tolerance:\t" << tolerance.transpose() << endl;
   }
 
-  cout << "ready! hit continue..." << endl;
+  cout << " Continuing step: " << step << endl;
+  cout << " from particle " << n_done << "/" << N << endl;
   std::cin.get();
 }
 
@@ -295,10 +297,7 @@ void Smc::run()  {
     stringstream e_tmp;
     e_tmp  << "./outputs/err" << setfill('0') << setw(2) << to_string(step) << ".txt";
     ofstream eps(e_tmp.str());
-    if (pflag)  { // Clears pre-existing state, dump step num, then open() for appendage
-      p_dat.open("./outputs/dtmp.txt");
-      p_dat << step << endl;
-      p_dat.close();
+    if (pflag)  { // Append to dtmp to continue an old run, otw it's just empty for a new step.
       p_dat.open("./outputs/dtmp.txt",ofstream::app);
     }
     cout << "ROUND: "<<step << endl;
@@ -309,6 +308,11 @@ void Smc::run()  {
     dat.close();
     eps.close();
     ++step;
+    if (pflag)  {
+      p_dat.close();
+      p_dat.open("./outputs/dtmp.txt"); // Must be a better way to close and clear file...
+      pd_dat.close();
+    }
   }
   wht.close();
   sig.close();
@@ -435,6 +439,7 @@ int Smc::test(int i,int cno)  {
  * \return void
  */
 void Smc::update()  {
+  n_done = 0;
   // Recalculate weights
   if (LFLAG) cout << "w" << flush;
   if (step==0)  {
