@@ -86,6 +86,58 @@ void Smc::restart()  {
   if (LFLAG)  {
     cout << "...reloading:" << endl;
   }
+  // To read in means sigma and sginv---------------------------------------------------------------
+  ifstream sfile("./outputs/sig.txt");
+  VectorXd tmp_in = Eigen::VectorXd::Zero(3*npar);
+  int numrnds = 0;
+  if (sfile.is_open())  {
+    string line;
+    while (getline(sfile,line))  {
+      ++numrnds;
+    }
+    sfile.clear();
+    sfile.seekg(0,sfile.beg);
+    step = numrnds/4; // Becuase 3 lines for mu,sigma,sginv and a blank line separator...
+    cout << "sig numlines: " << numrnds << " Step number: " << setfill('0') << setw(2) << step << endl;
+    int to_skip = npar*(step-1)*3-1;    // Mean, variance, stdev...
+    double read_in = 0.0;
+    int isig = 0;
+    while(sfile >> read_in)  {
+      if (isig++==to_skip)  {
+        break;           // Discard up to last round
+      }
+      if (sfile.eof())  {
+        cout << "but shouldn't have reached end of sig file..." << endl;
+        exit(-1);
+      }
+    }
+    isig = 0;
+    while (sfile >> read_in)  {
+      if (sfile.eof())  {
+          cout << "!" << endl;
+        break;
+      }
+      tmp_in(isig++) = read_in;
+    }
+    if (isig!=3*npar)  {
+      cout << "something went wrong? " << isig << endl;
+      exit(-1);
+    }
+  }
+  else  {
+    cout << "Want to restart but no sig" << endl;
+    exit(-1);
+  }
+  sfile.close();
+  means = tmp_in.head(npar);
+  sigma = tmp_in.segment(npar,npar);
+  sginv = tmp_in.tail(npar);
+  if (LFLAG)  {
+    cout << " mu:\t" << means.transpose() << endl
+         << " sg:\t" << sigma.transpose() << endl
+         << " si:\t" << sginv.transpose() << endl;
+  }
+
   // To read in particles_old from datXY.txt and N particles----------------------------------------
   stringstream pname;
   string line;
@@ -158,13 +210,6 @@ void Smc::restart()  {
   ifstream wfile("./outputs/wht.txt");
   VectorXd tmp_wht = VectorXd::Zero(N);
   if (wfile.is_open())  {
-    string line;
-    int numrnds = 0;
-    while (getline(wfile,line))  {
-      ++numrnds;
-    }
-    wfile.clear();
-    wfile.seekg(0,wfile.beg);
     int to_skip = (N+1)*(step-1)-1;   // Have ESS + N weights per line. now on step+1'th round (line)
     double read_in = 0.0;
     int iwht = 0;         // discard. seekg would be better...?
@@ -199,50 +244,6 @@ void Smc::restart()  {
     cout << " ESS:\t" << ess << endl;
     cout << " WHT:\t" << weights_old.head(1) << "\t" << weights_old.tail(1) << endl << endl;
   }
-  step = numrnds;
-
-  // To read in means sigma and sginv---------------------------------------------------------------
-  ifstream sfile("./outputs/sig.txt");
-  VectorXd tmp_in = Eigen::VectorXd::Zero(3*npar);
-  if (sfile.is_open())  {
-    int to_skip = npar*(step-1)*3-1;    // Mean, variance, stdev...
-    double read_in = 0.0;
-    int isig = 0;
-    while(sfile >> read_in)  {
-      if (isig++==to_skip)  {
-        break;           // Discard up to last round
-      }
-      if (sfile.eof())  {
-        cout << "but shouldn't have reached end of sig file..." << endl;
-        exit(-1);
-      }
-    }
-    isig = 0;
-    while (sfile >> read_in)  {
-      if (sfile.eof())  {
-          cout << "!" << endl;
-        break;
-      }
-      tmp_in(isig++) = read_in;
-    }
-    if (isig!=3*npar)  {
-      cout << "something went wrong? " << isig << endl;
-      exit(-1);
-    }
-  }
-  else  {
-    cout << "Want to restart but no sig" << endl;
-    exit(-1);
-  }
-  sfile.close();
-  means = tmp_in.head(npar);
-  sigma = tmp_in.segment(npar,npar);
-  sginv = tmp_in.tail(npar);
-  if (LFLAG)  {
-    cout << " mu:\t" << means.transpose() << endl
-         << " sg:\t" << sigma.transpose() << endl
-         << " si:\t" << sginv.transpose() << endl;
-  }
 
   // To read in tolerance to use from errXY.txt
   stringstream ename;
@@ -268,7 +269,7 @@ void Smc::restart()  {
     cout << " Tolerance:\t" << tolerance.transpose() << endl;
   }
 
-  cout << " Continuing step: " << step << endl;
+  cout << " Continuing step: " << setfill('0') << setw(2) << step << endl;
   cout << " from particle " << n_done << "/" << N << endl;
   std::cin.get();
 }
@@ -297,9 +298,7 @@ void Smc::run()  {
     stringstream e_tmp;
     e_tmp  << "./outputs/err" << setfill('0') << setw(2) << to_string(step) << ".txt";
     ofstream eps(e_tmp.str());
-    if (pflag)  { // Append to dtmp to continue an old run, otw it's just empty for a new step.
-      p_dat.open("./outputs/dtmp.txt",ofstream::app);
-    }
+    p_dat.open("./outputs/dtmp.txt",ofstream::app);
     cout << "ROUND: "<<step << endl;
     iterate();
     update();
@@ -308,11 +307,9 @@ void Smc::run()  {
     dat.close();
     eps.close();
     ++step;
-    if (pflag)  {
-      p_dat.close();
-      p_dat.open("./outputs/dtmp.txt"); // Must be a better way to close and clear file...
-      pd_dat.close();
-    }
+    p_dat.close();
+    p_dat.open("./outputs/dtmp.txt"); // Must be a better way to close and clear file...
+    p_dat.close();
   }
   wht.close();
   sig.close();
@@ -355,11 +352,9 @@ void Smc::iterate()  {
       acc = test(i,cno);
     }
     priors(i) = models[cno].params.pri;
-    if (pflag)  {
-      pstream << particles_new.row(i) << "\t" << epsilons.row(i) << endl;
-      p_dat << pstream.str();
-      pstream.str(string());
-    }
+    pstream << particles_new.row(i) << "\t" << epsilons.row(i) << "\n";
+    p_dat << pstream.str() << flush;
+    pstream.str(string());
     lstream.str(string());
   }
 }
